@@ -1,0 +1,6 @@
+{
+    "dataset": "rayyan",
+    "exception_type": "KeyError",
+    "exception_message": "11",
+    "exception_traceback": "Traceback (most recent call last):\n  File \"main.py\", line 102, in <module>\n    trainer.train_rules(rule_len, path_rules)  # For production rules, generate rules_final.txt from rules.txt\n  File \"/src/SeqGAN/train.py\", line 221, in train_rules\n    self.agent.generator.train_rules(rule_len, path_rules)\n  File \"/src/SeqGAN/models.py\", line 384, in train_rules\n    right = label2att[i + 1]\nKeyError: 11\n"
+}

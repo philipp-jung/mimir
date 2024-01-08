@@ -1,0 +1,8 @@
+t1&t2&EQ(t1.city,t2.city)&IQ(t1.class,t2.class)&EQ(t1.name,t2.name)
+t1&t2&EQ(t1.name,t2.name)&EQ(t1.phone,t2.phone)
+t1&t2&IQ(t1.addr,t2.addr)&EQ(t1.phone,t2.phone)
+t1&t2&IQ(t1.class,t2.class)&EQ(t1.addr,t2.addr)&EQ(t1.name,t2.name)
+t1&t2&EQ(t1.phone,t2.phone)&IQ(t1.city,t2.city)
+t1&t2&EQ(t1.class,t2.class)&EQ(t1.phone,t2.phone)
+t1&t2&EQ(t1.type,t2.type)&IQ(t1.class,t2.class)&EQ(t1.addr,t2.addr)&IQ(t1.city,t2.city)
+t1&t2&EQ(t1.type,t2.type)&EQ(t1.addr,t2.addr)&IQ(t1.name,t2.name)&IQ(t1.city,t2.city)

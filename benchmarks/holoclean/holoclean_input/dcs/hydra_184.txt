@@ -1,0 +1,2 @@
+t1&t2&EQ(t1.black_king_row,t2.black_king_row)&EQ(t1.black_king_col,t2.black_king_col)&EQ(t1.white_king_row,t2.white_king_row)&EQ(t1.white_king_col,t2.white_king_col)&EQ(t1.white_rook_row,t2.white_rook_row)&EQ(t1.white_rook_col,t2.white_rook_col)
+t1&t2&IQ(t1.game,t2.game)

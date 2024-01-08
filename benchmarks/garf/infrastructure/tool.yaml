@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: tool
+spec:
+  containers:
+  - args:
+    - while true; do sleep 30; done;
+    command:
+    - /bin/bash
+    - -c
+    - --
+    image: debian
+    name: tool
+    volumeMounts:
+    - mountPath: /garf-data
+      name: data-volume
+    - mountPath: /mirmir-data
+      name: mirmir-results-volume
+  volumes:
+  - name: data-volume
+    persistentVolumeClaim:
+      claimName: garf-measurements
+  - name: mirmir-results-volume
+    persistentVolumeClaim:
+      claimName: mirmir-results-volume

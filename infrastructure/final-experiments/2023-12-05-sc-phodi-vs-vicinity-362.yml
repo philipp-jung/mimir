@@ -1,0 +1,44 @@
+apiVersion: batch/v1
+kind: Job 
+metadata:
+  name: 2023-12-05-sc-phodi-vs-vicinity-362
+spec:
+  completions: 1
+  template:
+    metadata:
+      labels:
+        app: 2023-12-05-sc-phodi-vs-vicinity-362
+    spec:
+      restartPolicy: Never
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      priorityClassName: unimportant
+      containers:
+        - name: mirmir
+          image: docker.io/larmor27/mirmir:latest
+          env:
+            - name: CONFIG
+              value: '{"dataset": "1481", "n_rows": 1000, "error_fraction": 5, "error_class": "simple_mcar", "labeling_budget": 20, "synth_tuples": 100, "auto_instance_cache_model": false, "clean_with_user_input": true, "gpdep_threshold": 0.3, "training_time_limit": 90, "feature_generators": ["auto_instance", "fd", "llm_correction", "llm_master"], "classification_model": "ABC", "vicinity_orders": [1], "vicinity_feature_generator": "naive", "n_best_pdeps": 3, "synth_cleaning_threshold": 0.9, "test_synth_data_direction": "user_data", "pdep_features": ["pr"], "fd_feature": "norm_gpdep", "domain_model_threshold": 0.01, "run": 2}'
+            - name: EXPERIMENT_ID
+              value: 2023-12-05-sc-phodi-vs-vicinity-362
+          volumeMounts:
+            - name: mirmir-results-volume
+              mountPath: /measurements  # Mounting the PVC at /app/output directory in the container
+          resources:
+            requests:
+              # only start on nodes with 64Gi of RAM available 
+              memory: "64Gi"   
+              # only start on nodes with 26 CPU cores available
+              cpu: 26   
+            limits:
+              # kill the pod when it uses more than 64Gi of RAM
+              memory: "64Gi"  
+              # restrict the pod to never use more than 26 full CPU cores
+              cpu: 26
+      volumes:
+        - name: mirmir-results-volume
+          persistentVolumeClaim:
+            claimName: mirmir-results-volume
+    

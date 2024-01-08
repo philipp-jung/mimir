@@ -1,0 +1,2 @@
+t1&t2&IQ(t1.Class,t2.Class)
+t1&t2&EQ(t1.V4,t2.V4)&EQ(t1.V3,t2.V3)&EQ(t1.V2,t2.V2)&EQ(t1.V1,t2.V1)&EQ(t1.V6,t2.V6)&EQ(t1.V5,t2.V5)
