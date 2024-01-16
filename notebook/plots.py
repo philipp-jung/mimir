@@ -2,7 +2,9 @@ from pathlib import Path, PosixPath
 import pandas as pd
 import json
 from matplotlib import pyplot as plt
+from matplotlib import patches
 import matplotlib.patches as mpatches
+import matplotlib.gridspec as gridspec
 import seaborn as sns
 from typing import List, Tuple, Dict
 import datetime
@@ -17,6 +19,8 @@ TEXTWIDTH_IN = TEXTWIDTH_PT / 72.27
 FIGURE_WIDTH = TEXTWIDTH_IN
 FIGURE_HEIGHT = 16/9 * FIGURE_WIDTH
 
+PATTERN_PALETTE = ['///', '...', '\\\\\\', '++', 'xx', 'OO']
+
 ABLATION_BAR_CUSTOM_LABELS = {
     'all models': 'All Correctors',
     'llm_master': '(no) RD_ImpFM',
@@ -25,6 +29,7 @@ ABLATION_BAR_CUSTOM_LABELS = {
     'auto_instance': '(no) IM_DataWig',
 }
 ABLATION_SCATTER_CUSTOM_LABELS = {
+    'all models': 'All Correctors',
     'auto_instance': 'IM_DataWig',
     'no auto_instance': 'no IM_DataWig',
     'llm_master': 'RD_ImpFM',
@@ -34,11 +39,20 @@ ABLATION_SCATTER_CUSTOM_LABELS = {
     'llm_correction': 'ET_CorrFM',
     'no llm_correction': 'no ET_CorrFM',
 } 
+ABLATION_PATTERN_MAP = {
+    'All Correctors': PATTERN_PALETTE[5],
+    'IM_DataWig': PATTERN_PALETTE[1],
+    'no IM_DataWig': PATTERN_PALETTE[1],
+    'SC_Phodi': PATTERN_PALETTE[2],
+    'no SC_Phodi': PATTERN_PALETTE[2], 
+    'ET_CorrFM': PATTERN_PALETTE[3], 
+    'no ET_CorrFM': PATTERN_PALETTE[3], 
+    'RD_ImpFM': PATTERN_PALETTE[4],
+    'no RD_ImpFM': PATTERN_PALETTE[4]
+}
 
 
-PATTERN_PALETTE = ['///', '...', '\\\\\\', '++', 'xx', 'OO']
-
-ACHSEN_FONTSIZE = 15
+ACHSEN_FONTSIZE = 12
 REST_FONTSIZE = ACHSEN_FONTSIZE - 3
 
 ABLATION_COLUMN_ORDER_1 = list(reversed(['all models', 'no llm_master', 'no llm_correction',  'no fd', 'no auto_instance',]))
@@ -46,11 +60,12 @@ ABLATION_COLUMN_ORDER_2 = list(reversed(['all models', 'llm_master', 'llm_correc
 
 ABLATION_COLOR_PALETTE = sns.color_palette("Set3", 6)
 
-MIRMIR_LABEL_COLORS = {
+MIMIR_LABEL_COLORS = {
     'no auto_instance': ABLATION_COLOR_PALETTE[0],
     'no fd': ABLATION_COLOR_PALETTE[2],
     'no llm_correction': ABLATION_COLOR_PALETTE[3],
     'no llm_master': ABLATION_COLOR_PALETTE[4],
+    'All Correctors': ABLATION_COLOR_PALETTE[5],
     'all models': ABLATION_COLOR_PALETTE[5],
     'auto_instance': ABLATION_COLOR_PALETTE[0],
     'fd': ABLATION_COLOR_PALETTE[2],
@@ -249,7 +264,7 @@ def normalize_dataset(row):
     elif (row.get('error_class', '') == '') or (row.get('error_class', '') is None):
         return f"{row['dataset']} {int(row['error_fraction'])}%"
     elif row.get('error_class', '').startswith('imputer'):
-        return f"{row['dataset']} cat {int(row['error_fraction'])}%"
+        return f"{row['dataset']} \n cat {int(row['error_fraction'])}%"
     return f"{row['dataset']} {int(row['error_fraction'])}%"
 
 def get_ablation_study(ablation_study_dir: str):
@@ -294,7 +309,7 @@ def plot_global_ablation_study(ablation_study_dir: str) -> Tuple[plt.figure, Tup
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(FIGURE_WIDTH*2, FIGURE_HEIGHT), sharey=True)
 
     # Plot the first sub-plot
-    sub_pivot_df1.plot(kind='barh', ax=ax1, color=[MIRMIR_LABEL_COLORS[label] for label in sub_pivot_df1.columns], legend=False, width=0.65)
+    sub_pivot_df1.plot(kind='barh', ax=ax1, color=[MIMIR_LABEL_COLORS[label] for label in sub_pivot_df1.columns], legend=False, width=0.65)
     ax1.set_ylabel('')
     ax1.set_xlabel('$F_1$ score')
     ax1.set_title('Drop One Corrector')
@@ -303,21 +318,219 @@ def plot_global_ablation_study(ablation_study_dir: str) -> Tuple[plt.figure, Tup
     sub_pivot_df2 = pivot_df[ABLATION_COLUMN_ORDER_2]
 
     # Plot the second sub-plot
-    sub_pivot_df2.plot(kind='barh', ax=ax2, color=[MIRMIR_LABEL_COLORS[label] for label in sub_pivot_df2.columns], legend=False, width=0.65)
+    sub_pivot_df2.plot(kind='barh', ax=ax2, color=[MIMIR_LABEL_COLORS[label] for label in sub_pivot_df2.columns], legend=False, width=0.65)
     ax2.set_ylabel('Dataset')
     ax2.set_xlabel('$F_1$ score')
     ax2.set_title('Select One Corrector')
 
     # Create custom handles for the legend
-    custom_handles = [mpatches.Patch(color=MIRMIR_LABEL_COLORS[key], label=ABLATION_BAR_CUSTOM_LABELS[key]) for key in ABLATION_BAR_CUSTOM_LABELS]
+    custom_handles = [mpatches.Patch(color=MIMIR_LABEL_COLORS[key], label=ABLATION_BAR_CUSTOM_LABELS[key]) for key in ABLATION_BAR_CUSTOM_LABELS]
 
-    fig.legend(custom_handles, ABLATION_BAR_CUSTOM_LABELS.values(), title='Ensembles', loc='upper right', fontsize=7, bbox_to_anchor=(1, 1))
+    fig.legend(custom_handles, ABLATION_BAR_CUSTOM_LABELS.values(), title='Ensembles', loc='upper right', fontsize=REST_FONTSIZE, bbox_to_anchor=(1, 1))
 
     # Adjust layout and save the figure
     plt.tight_layout(rect=(0, 0, 0.88, 1.06))
-    #plt.savefig('img/2023-11-11-global-ablation-study.pgf', bbox_inches='tight')
     return fig, (ax1, ax2), failed_measurements
 
+def ablation_scatter(mimir_ablation_path: str) -> Tuple[plt.figure, plt.axes, List]:
+    results, failed_measurements = get_mimir_result(mimir_ablation_path)
+    results = [{**r, 'feature_generators': format_feature_generators(r['feature_generators'])} for r in results]
+    df = pd.DataFrame(results)
+    df['normal_dataset'] = df.apply(normalize_dataset, axis=1)
+
+    df = (df.loc[:, ['normal_dataset', 'feature_generators', 'error_class', 'error_fraction', 'f1']]
+        .groupby(['normal_dataset', 'feature_generators', 'error_class', 'error_fraction'])
+        .agg({'f1': 'mean'})
+        .reset_index()
+    )
+
+    pivot_df = df.pivot(index='normal_dataset', columns='feature_generators', values='f1')
+
+    # Plotting with Seaborn
+    fig, ax = plt.subplots(nrows=1, ncols=1, constrained_layout=True, figsize=(FIGURE_WIDTH, FIGURE_HEIGHT))
+
+    # Plotting other models
+    for col in pivot_df.columns:
+        if col != 'all models':
+            sns.scatterplot(x=pivot_df[col], y=pivot_df['all models'], label=col, marker='.', ax=ax)
+
+    # Plotting the diagonal line
+    ax.plot([0, 1], [0, 1], '-k', alpha=.5)
+    ax.set_aspect('equal', adjustable='box')
+
+    # Adjust legend position
+    handles, _ = ax.get_legend_handles_labels()
+    labels = [ABLATION_SCATTER_CUSTOM_LABELS[c] for c in pivot_df.columns if c != 'all models']
+    ax.legend(handles, labels, loc='center left', bbox_to_anchor=(1, 0.5), ncol=1, frameon=True, title='Ablations')
+
+    # Set axis labels
+    plt.xlabel("$F_1$ score Ablations")
+    plt.ylabel("$F_1$ score Mimir's Ensemble")
+
+    return fig, ax, failed_measurements
+
+
+def plot_joint_ablation(ablation_study_dir: str) -> Tuple[plt.figure, Tuple[plt.axes, plt.axes], List]:
+    """
+    Joint local ablation barchat and scatterplot.
+    """
+    df_global, failed_measurements = get_ablation_study(ablation_study_dir)
+    df_global = df_global.groupby(['dataset', 'feature_generators', 'error_fraction', 'error_class']).agg({'f1': 'mean',
+                                                                                        'precision': 'mean',
+                                                                                        'recall': 'mean',
+                                                                                        'run': list}).reset_index()
+    df_global['normal_dataset'] = df_global.apply(normalize_dataset, axis=1)
+
+    # get relevant datasets
+    df = df_global[df_global['normal_dataset'].isin(['flights', 'beers', '151 \n cat 5%', '43572 \n cat 5%'])]
+
+    pivot_df = df.pivot(index='normal_dataset', columns='feature_generators', values='f1')
+
+    # Reorder the columns of the pivot_df dataframe for the first sub-plot
+    sub_pivot_df1 = pivot_df[ABLATION_COLUMN_ORDER_1]
+
+    fig = plt.figure(constrained_layout=True)
+    gs0 = gridspec.GridSpec(2, 2, figure=fig)
+
+    gs00 = gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=gs0[2:])
+    ax0 = fig.add_subplot(gs00[:, 0])
+    ax1 = fig.add_subplot(gs00[:, 1])
+
+    gs10 = gridspec.GridSpecFromSubplotSpec(1, 2, subplot_spec=gs0[0:2])
+    ax2 = fig.add_subplot(gs10[:,1])
+
+    # Plot the first sub-plot
+    sub_pivot_df1.plot(kind='barh', ax=ax0, rot=0, color=[MIMIR_LABEL_COLORS[label] for label in sub_pivot_df1.columns], legend=False, width=0.75)
+    ax0.set_ylabel('', labelpad=4, fontsize=ACHSEN_FONTSIZE)
+    ax0.set_xlabel('$F_1$ score', labelpad=-12, fontsize=ACHSEN_FONTSIZE)
+    ax0.set_title('')
+    ax0.spines['top'].set_visible(False)
+    ax0.spines['right'].set_visible(False)
+
+    # Define headlines for barcharts
+    h_headlines = [plt.plot([],marker=m, ls="", color='black')[0] for m in ['X', 'o']]
+    l_headlines = ["Drop One Corrector", "Select One Corrector"]
+
+    # improvise a headline with the legend - forgive me.
+    leg = ax0.legend(
+               [h_headlines[0]],
+               [l_headlines[0]],
+               loc='upper center',
+               bbox_to_anchor=(.50, 1.15),
+               borderaxespad=0.,
+               ncol=1,
+               frameon=False,
+               fontsize=ACHSEN_FONTSIZE)
+
+    for vpack in leg._legend_handle_box.get_children():
+        for hpack in vpack.get_children()[:1]:
+            hpack.get_children()[0].set_width(8)
+
+    ax0.set_xticks([0.0, 1.0])  # Set x-axis ticks
+
+    # Remove ticks from the y-axis
+    ax0.tick_params(axis='y', which='both', left=False, labelleft=True, pad=0, labelsize=ACHSEN_FONTSIZE)
+
+    for i, b in enumerate(ax0.patches):
+        b.set_hatch(PATTERN_PALETTE[i//4])
+        b.set_edgecolor("black")
+        
+    # Reorder the columns of the pivot_df dataframe for the second sub-plot
+    sub_pivot_df2 = pivot_df[ABLATION_COLUMN_ORDER_2]
+
+    # Plot the second sub-plot
+    sub_pivot_df2.plot(kind='barh', ax=ax1, rot=0, color=[MIMIR_LABEL_COLORS[label] for label in sub_pivot_df2.columns], legend=False, width=0.75)
+    ax1.set_xlabel('$F_1$ score', labelpad=-12, fontsize=ACHSEN_FONTSIZE)
+    ax1.set_ylabel('')
+    ax1.set_title('')
+    ax1.spines['top'].set_visible(False)
+    ax1.spines['right'].set_visible(False)
+
+    ax1.set_xticks([0.0, 1.0])
+
+    # improvise a headline with the legend - forgive me.
+    leg = ax1.legend(
+               [h_headlines[1]],
+               [l_headlines[1]],
+               loc='upper center',
+               bbox_to_anchor=(.50, 1.15),
+               borderaxespad=0.,
+               ncol=1,
+               frameon=False,
+               fontsize=ACHSEN_FONTSIZE)
+
+    for vpack in leg._legend_handle_box.get_children():
+        for hpack in vpack.get_children()[:1]:
+            hpack.get_children()[0].set_width(8)
+
+    # Remove ticks from the y-axis
+    ax1.tick_params(axis='y', which='both', left=False, labelleft=False)
+
+    for i, b in enumerate(ax1.patches):
+        b.set_hatch(PATTERN_PALETTE[i//4])
+        b.set_edgecolor("black")
+
+    # Plot scatters at the bottom
+    results, failed_measurements = get_mimir_result(ablation_study_dir)
+    results = [{**r, 'feature_generators': format_feature_generators(r['feature_generators'])} for r in results]
+    df_scatter = pd.DataFrame(results)
+    df_scatter['normal_dataset'] = df_scatter.apply(normalize_dataset, axis=1)
+
+    df_scatter = (df_scatter.loc[:, ['normal_dataset', 'feature_generators', 'error_class', 'error_fraction', 'f1']]
+        .groupby(['normal_dataset', 'feature_generators', 'error_class', 'error_fraction'])
+        .agg({'f1': 'mean'})
+        .reset_index()
+    )
+
+    pivot_df = df_scatter.pivot(index='normal_dataset', columns='feature_generators', values='f1')
+
+    for col in pivot_df.columns:
+        if col != 'all models':
+            marker = 'X' if col.startswith('no') else 'o'
+            sns.scatterplot(x=pivot_df[col], y=pivot_df['all models'], color=MIMIR_LABEL_COLORS[col], label=col, marker=marker, ax=ax2, legend=False)
+
+    # Plotting the diagonal line
+    ax2.plot([0, 1], [0, 1], '-k', alpha=.5)
+    ax2.set_aspect('equal', adjustable='box')
+
+    h_select, l_select = ax1.get_legend_handles_labels()
+    l_select = [ABLATION_BAR_CUSTOM_LABELS[c] for c in l_select]
+
+    handles = [*reversed(h_select)]
+    labels = [*reversed(l_select)]
+
+    leg = fig.legend(
+               handles,
+               labels,
+               loc='center left',
+               bbox_to_anchor=(0.17, .8),
+               borderaxespad=0.,
+               ncol=1,
+               frameon=True,
+               title='Ablations',
+               title_fontsize=ACHSEN_FONTSIZE)
+
+    # Set axis labels
+    ax2.set_xlabel("$F_1$ score Ablations", fontsize=ACHSEN_FONTSIZE)
+    ax2.set_ylabel("$F_1$ score Mimir", fontsize=ACHSEN_FONTSIZE)
+
+    ax2.set_xticks([0.0, .2, .4, .6, .8, 1.0])
+    ax2.set_yticks([0.0, .2, .4, .6, .8, 1.0])
+    
+    arrow = patches.ConnectionPatch(
+        [0.95, 2.95],
+        [1, 0.84],
+        coordsA=ax1.transData,
+        coordsB=ax2.transData,
+        connectionstyle=patches.ConnectionStyle("angle3", ),#rad=-0.4),
+        color="black",
+        arrowstyle="<-",  # "normal" arrow
+        mutation_scale=20,  # controls arrow head size
+        linewidth=1.5,
+    )
+    fig.patches.append(arrow)
+
+    return fig, (ax0, ax1, ax2), failed_measurements, pivot_df
 
 def plot_local_ablation_study(ablation_study_dir: str) -> Tuple[plt.figure, Tuple[plt.axes, plt.axes], List]:
     """
@@ -331,7 +544,7 @@ def plot_local_ablation_study(ablation_study_dir: str) -> Tuple[plt.figure, Tupl
     df_global['normal_dataset'] = df_global.apply(normalize_dataset, axis=1)
 
     # get relevant datasets
-    df = df_global[df_global['normal_dataset'].isin(['flights', 'beers', '151 cat 5%', '43572 cat 5%'])]
+    df = df_global[df_global['normal_dataset'].isin(['flights', 'beers', '151 \n cat 5%', '43572 \n cat 5%'])]
 
     pivot_df = df.pivot(index='normal_dataset', columns='feature_generators', values='f1')
 
@@ -342,7 +555,7 @@ def plot_local_ablation_study(ablation_study_dir: str) -> Tuple[plt.figure, Tupl
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(FIGURE_WIDTH*2, FIGURE_HEIGHT), sharey=True,)
 
     # Plot the first sub-plot
-    sub_pivot_df1.plot(kind='barh', ax=ax1, rot=0, color=[MIRMIR_LABEL_COLORS[label] for label in sub_pivot_df1.columns], legend=False, width=0.75)
+    sub_pivot_df1.plot(kind='barh', ax=ax1, rot=0, color=[MIMIR_LABEL_COLORS[label] for label in sub_pivot_df1.columns], legend=False, width=0.75)
     ax1.set_ylabel('Dataset', labelpad=4, fontsize=ACHSEN_FONTSIZE)
     ax1.set_xlabel('$F_1$ score', labelpad=-8, fontsize=ACHSEN_FONTSIZE)
     ax1.set_title('Drop One Corrector')
@@ -363,7 +576,7 @@ def plot_local_ablation_study(ablation_study_dir: str) -> Tuple[plt.figure, Tupl
     sub_pivot_df2 = pivot_df[ABLATION_COLUMN_ORDER_2]
 
     # Plot the second sub-plot
-    sub_pivot_df2.plot(kind='barh', ax=ax2, rot=0, color=[MIRMIR_LABEL_COLORS[label] for label in sub_pivot_df2.columns], legend=False, width=0.75)
+    sub_pivot_df2.plot(kind='barh', ax=ax2, rot=0, color=[MIMIR_LABEL_COLORS[label] for label in sub_pivot_df2.columns], legend=False, width=0.75)
     ax2.set_xlabel('$F_1$ score', labelpad=-8, fontsize=ACHSEN_FONTSIZE)
     ax2.set_title('Select One Corrector')
     ax2.spines['top'].set_visible(False)
@@ -380,7 +593,7 @@ def plot_local_ablation_study(ablation_study_dir: str) -> Tuple[plt.figure, Tupl
         b.set_edgecolor("black")
 
     # Create custom handles for the legend
-    custom_handles = [mpatches.Patch(facecolor=MIRMIR_LABEL_COLORS[key], 
+    custom_handles = [mpatches.Patch(facecolor=MIMIR_LABEL_COLORS[key], 
                                     label=ABLATION_BAR_CUSTOM_LABELS[key], 
                                     hatch=list(reversed(PATTERN_PALETTE))[i], 
                                     #rasterized=True,
@@ -414,23 +627,23 @@ def get_baran_experiment(baran_results_path: str, baran_experiment_name: str) ->
     res_baran = [{**r, 'normalized_dataset': normalize_dataset(r)} for r in res_baran]
     return res_baran
 
-def get_mirmir_result(mirmir_results_path: str) -> Tuple[List[dict], List]:
-    res_mirmir = []
-    pathlist = Path(mirmir_results_path).glob('*.json')
+def get_mimir_result(mimir_results_path: str) -> Tuple[List[dict], List]:
+    res_mimir = []
+    pathlist = Path(mimir_results_path).glob('*.json')
     for path in pathlist:
         with open(path) as f:
-            res_mirmir.append(json.load(f))
+            res_mimir.append(json.load(f))
 
-    failed_measurements = [m for m in res_mirmir if m['status'] == 0]
-    print(f'Loaded Mimir Results. {len(failed_measurements)}/{len(res_mirmir)} measurements failed.')
+    failed_measurements = [m for m in res_mimir if m['status'] == 0]
+    print(f'Loaded Mimir Results. {len(failed_measurements)}/{len(res_mimir)} measurements failed.')
 
-    res_mirmir = [{**m['config'], **m['result'], 'ensemble': 'Mimir', 'dataset_group': get_dataset_group(m['config']['dataset'])} for m in res_mirmir if m['status'] == 1]  # some measurements crash
-    res_mirmir = [m for m in res_mirmir if not (m['dataset_group'] == 'OpenML' and m['error_fraction'] == 1)]
-    res_mirmir = [{**m, 'normalized_dataset': normalize_dataset(m)} for m in res_mirmir]
+    res_mimir = [{**m['config'], **m['result'], 'ensemble': 'Mimir', 'dataset_group': get_dataset_group(m['config']['dataset'])} for m in res_mimir if m['status'] == 1]  # some measurements crash
+    res_mimir = [m for m in res_mimir if not (m['dataset_group'] == 'OpenML' and m['error_fraction'] == 1)]
+    res_mimir = [{**m, 'normalized_dataset': normalize_dataset(m)} for m in res_mimir]
 
     # filter out 1% on OpenML because these are always perfectly cleaned
-    res_mirmir = [r for r in res_mirmir if not (r['dataset'] in OPENML_DATASETS and str(r['error_fraction']) == '1')]
-    return res_mirmir, failed_measurements
+    res_mimir = [r for r in res_mimir if not (r['dataset'] in OPENML_DATASETS and str(r['error_fraction']) == '1')]
+    return res_mimir, failed_measurements
 
 def get_holoclean_global_performance(holoclean_results_path: str):
     hc_results = []
@@ -481,14 +694,14 @@ def get_garf_global_performance(garf_results_path: str):
     results = [r for r in results if not (r['dataset'] in RENUVER_DATASETS and str(r['error_fraction']) in ['2', '4', '5'])]
     return results
 
-def plot_mirmir_vs_baran(mirmir_results_path: str, baran_results_path: str, baran_experiment_name: str) -> Tuple[plt.figure, plt.axes, pd.DataFrame, List]:
+def plot_mimir_vs_baran(mimir_results_path: str, baran_results_path: str, baran_experiment_name: str) -> Tuple[plt.figure, plt.axes, pd.DataFrame, List]:
     """
     Boxplot global performance Mimir vs Baran.
     """
     res_baran = get_baran_experiment(baran_results_path, baran_experiment_name)
-    res_mirmir, failed_measurements = get_mirmir_result(mirmir_results_path)
+    res_mimir, failed_measurements = get_mimir_result(mimir_results_path)
 
-    df = pd.DataFrame([*res_mirmir, *res_baran])
+    df = pd.DataFrame([*res_mimir, *res_baran])
 
     df_melt = pd.melt(df, id_vars=['dataset_group', 'ensemble'], value_vars=['f1'], 
                   var_name='F1 Type', value_name='F1 Score')
@@ -513,9 +726,9 @@ def plot_mirmir_vs_baran(mirmir_results_path: str, baran_results_path: str, bara
     ax.set_yticks([0.0, 0.25, 0.5, 0.75, 1.0])
 
     # Add legend
-    ax.legend(loc='upper center',
-            bbox_to_anchor=(0.5, 1.1), 
-            fontsize=8, 
+    ax.legend(loc='best',
+            #bbox_to_anchor=(0.5, 1.1), 
+            fontsize=REST_FONTSIZE, 
             ncol=len(df_melt['ensemble'].unique())
             )
 
@@ -524,13 +737,13 @@ def plot_mirmir_vs_baran(mirmir_results_path: str, baran_results_path: str, bara
 
     return fig, ax, df_melt, failed_measurements
 
-def performance_table(mirmir_results_path: str, baran_results_path: str, baran_experiment_name: str, garf_results_path: str, holoclean_results_path: str) -> Tuple[pd.DataFrame, List]:
-    res_mirmir, failed_measurements = get_mirmir_result(mirmir_results_path)
-    res_mirmir = [{'normalized_dataset': r['normalized_dataset'],
+def performance_table(mimir_results_path: str, baran_results_path: str, baran_experiment_name: str, garf_results_path: str, holoclean_results_path: str) -> Tuple[pd.DataFrame, List]:
+    res_mimir, failed_measurements = get_mimir_result(mimir_results_path)
+    res_mimir = [{'normalized_dataset': r['normalized_dataset'],
                    'ensemble': r['ensemble'],
                    'f1': r['f1'],
                    'precision': r['precision'],
-                   'recall': r['recall']} for r in res_mirmir]
+                   'recall': r['recall']} for r in res_mimir]
 
     res_baran = get_baran_experiment(baran_results_path, baran_experiment_name)
     res_baran = [{'normalized_dataset': r['normalized_dataset'],
@@ -552,7 +765,7 @@ def performance_table(mirmir_results_path: str, baran_results_path: str, baran_e
                    'f1': r['f1'],
                    'precision': r['precision'],
                    'recall': r['recall']} for r in res_garf]
-    df = pd.DataFrame([*res_mirmir, *res_baran, *res_hc, *res_garf])
+    df = pd.DataFrame([*res_mimir, *res_baran, *res_hc, *res_garf])
 
     return (pd.pivot((df.loc[:, ['normalized_dataset', 'ensemble', 'f1']]
             .groupby(['normalized_dataset', 'ensemble'])
@@ -568,7 +781,7 @@ def et_corrfm_vs_value_model_v2(mimir_result_dir: str) -> Tuple[plt.figure, List
     """
     Neue Version des Plots, in der das Value Model in Mimir implementiert ist.
     """
-    res_mimir, failed_measurements = get_mirmir_result(mimir_result_dir)
+    res_mimir, failed_measurements = get_mimir_result(mimir_result_dir)
     res_mimir = [{'normalized_dataset': r['normalized_dataset'],
                    'feature_generators': format_feature_generators(r['feature_generators']),
                    'f1': r['f1'],
@@ -597,7 +810,7 @@ def et_corrfm_vs_value_model_v2(mimir_result_dir: str) -> Tuple[plt.figure, List
 
     for i, measure, label in [(0, 'precision', 'Precision'), (1, 'recall', 'Recall')]:
         sns.scatterplot(x=df_scatter[measure]['value_model'], y=df_scatter[measure]['llm_correction'], ax=axes[i], color=palette[4])
-        sns.lineplot(x=[0, 1], y=[0, 1], ax=axes[i], color=palette[4])
+        sns.lineplot(x=[0, 1], y=[0, 1], ax=axes[i], color='black', alpha=.5)
         
         axes[i].set_xlabel(f'{label} Value Model', fontsize=ACHSEN_FONTSIZE)
         axes[i].set_ylabel(f'{label} ET_CorrFM', fontsize=ACHSEN_FONTSIZE)
@@ -616,7 +829,7 @@ def et_corrfm_vs_value_model_v2(mimir_result_dir: str) -> Tuple[plt.figure, List
             axes[i].annotate(d, (x_value, y_value), textcoords="offset points", xytext=(10, 10), ha="right", va="top", fontsize=8)
 
     df['feature_generators'] = df['feature_generators'].replace('all models', 'Ensembled llm_correction')
-    sns.boxplot(y='feature_generators', x='f1', data=df, ax=axes[2], palette=MIRMIR_LABEL_COLORS)
+    sns.boxplot(y='feature_generators', x='f1', data=df, ax=axes[2], palette=MIMIR_LABEL_COLORS)
     custom_labels = ['Ensembled Value Model', 'Ensembled ET_CorrFM', 'ET_CorrFM', 'Value Model']  # Replace with your desired labels
     axes[2].set_yticklabels(custom_labels)
     # sns.swarmplot(data=df[df['normalized_dataset'].isin(dataset_subset)], x='f1', y='feature_generators', color='black', size=3.5, dodge=True, legend=False, ax=axes[2])
@@ -626,18 +839,22 @@ def et_corrfm_vs_value_model_v2(mimir_result_dir: str) -> Tuple[plt.figure, List
     axes[2].tick_params(axis='y', labelsize=ACHSEN_FONTSIZE)
     axes[2].tick_params(axis='x', labelsize=REST_FONTSIZE)
 
+    letters = ['a', 'b', 'c']
     for i, ax in axes.items():
         ax.yaxis.set_label_coords(-0.2, 0.5)  # Adjust the position of y-axis label
         # Add label in the bottom right corner
-        letters = ['a', 'b', 'c', 'd']
-        ax.text(-0.2, -.17, f'{letters[i]})', transform=ax.transAxes,
+        x, y = -0.04, -0.135
+        if i == 2:
+            x, y = -.018, -0.13
+        ax.text(x, y, f'{letters[i]})', transform=ax.transAxes,
                 ha='right', va='bottom', bbox=dict(facecolor='white', alpha=0.8, edgecolor='white'),
             fontsize=REST_FONTSIZE)
 
+
     return fig, axes, df_scatter
 
-def sc_phodi_vs_vicinity_model(mirmir_phodi_vs_vicinity_dir: str) -> Tuple[plt.figure, List[plt.axes], List]:
-    results, failed_measurements = get_mirmir_result(mirmir_phodi_vs_vicinity_dir)
+def sc_phodi_vs_vicinity_model(mimir_phodi_vs_vicinity_dir: str) -> Tuple[plt.figure, List[plt.axes], List]:
+    results, failed_measurements = get_mimir_result(mimir_phodi_vs_vicinity_dir)
     df = pd.DataFrame(results)
     results = [{**r, 'feature_generators': format_feature_generators(r.get('feature_generators'))} for r in results]
     df = pd.DataFrame(results)
@@ -660,7 +877,7 @@ def sc_phodi_vs_vicinity_model(mirmir_phodi_vs_vicinity_dir: str) -> Tuple[plt.f
 
     for i, measure, label in [(0, 'precision', 'Precision'), (1, 'recall', 'Recall'),]:
         sns.scatterplot(x=df_pivot[measure]['Vicinity Model'], y=df_pivot[measure]['SC_Phodi'], ax=axes[i], color='black')
-        sns.lineplot(x=[0, 1], y=[0, 1], ax=axes[i], color=palette[4])
+        sns.lineplot(x=[0, 1], y=[0, 1], ax=axes[i], color='black', alpha=.5)
         
         axes[i].set_xlabel(f'{label} Vicinity Model', fontsize=ACHSEN_FONTSIZE)
         axes[i].set_ylabel(f'{label} SC_Phodi', fontsize=ACHSEN_FONTSIZE)
@@ -673,7 +890,7 @@ def sc_phodi_vs_vicinity_model(mirmir_phodi_vs_vicinity_dir: str) -> Tuple[plt.f
         axes[i].set_yticklabels([0, '', '', '', 1.00], fontsize=REST_FONTSIZE)
         
 
-    sns.boxplot(y='feature_generators', x='f1', data=df, ax=axes[2], palette=MIRMIR_LABEL_COLORS)
+    sns.boxplot(y='feature_generators', x='f1', data=df, ax=axes[2], palette=MIMIR_LABEL_COLORS)
     # sns.swarmplot(data=df, x='f1', y='feature_generators', color="black", size=3.5, dodge=True, legend=False, ax=axes[2])
 
     axes[2].set_xlabel('$F_1$ score', fontsize=ACHSEN_FONTSIZE)
@@ -681,50 +898,16 @@ def sc_phodi_vs_vicinity_model(mirmir_phodi_vs_vicinity_dir: str) -> Tuple[plt.f
 
     axes[2].tick_params(axis='y', labelsize=REST_FONTSIZE)
     axes[2].tick_params(axis='x', labelsize=REST_FONTSIZE)
-        
+
+    letters = ['a', 'b', 'c']
     for i, ax in axes.items():
         ax.yaxis.set_label_coords(-0.2, 0.5)  # Adjust the position of y-axis label
         # Add label in the bottom right corner
-        letters = ['a', 'b', 'c', 'd']
-        ax.text(-0.2, -.17, f'{letters[i]})', transform=ax.transAxes,
+        x, y = -0.04, -0.135
+        if i == 2:
+            x, y = -.018, -0.13
+        ax.text(x, y, f'{letters[i]})', transform=ax.transAxes,
                 ha='right', va='bottom', bbox=dict(facecolor='white', alpha=0.8, edgecolor='white'),
             fontsize=REST_FONTSIZE)
 
     return fig, axes, failed_measurements
-
-def ablation_scatter(mirmir_ablation_path: str) -> Tuple[plt.figure, plt.axes, List]:
-    results, failed_measurements = get_mirmir_result(mirmir_ablation_path)
-    results = [{**r, 'feature_generators': format_feature_generators(r['feature_generators'])} for r in results]
-    df = pd.DataFrame(results)
-    df['normal_dataset'] = df.apply(normalize_dataset, axis=1)
-
-    df = (df.loc[:, ['normal_dataset', 'feature_generators', 'error_class', 'error_fraction', 'f1']]
-        .groupby(['normal_dataset', 'feature_generators', 'error_class', 'error_fraction'])
-        .agg({'f1': 'mean'})
-        .reset_index()
-    )
-
-    pivot_df = df.pivot(index='normal_dataset', columns='feature_generators', values='f1')
-
-    # Plotting with Seaborn
-    fig, ax = plt.subplots(nrows=1, ncols=1, constrained_layout=True, figsize=(FIGURE_WIDTH, FIGURE_HEIGHT))
-
-    # Plotting other models
-    for col in pivot_df.columns:
-        if col != 'all models':
-            sns.scatterplot(x=pivot_df[col], y=pivot_df['all models'], label=col, marker='.', ax=ax)
-
-    # Plotting the diagonal line
-    ax.plot([0, 1], [0, 1], '-k',)
-    ax.set_aspect('equal', adjustable='box')
-
-    # Adjust legend position
-    handles, _ = ax.get_legend_handles_labels()
-    labels = [ABLATION_SCATTER_CUSTOM_LABELS[c] for c in pivot_df.columns if c != 'all models']
-    ax.legend(handles, labels, fontsize=6, loc='center left', bbox_to_anchor=(1, 0.5), ncol=1, frameon=True, title='Ablations')
-
-    # Set axis labels
-    plt.xlabel("$F_1$ score ablations")
-    plt.ylabel("$F_1$ score Mimir's ensemble")
-
-    return fig, ax, failed_measurements

@@ -31,12 +31,24 @@ class Cleaning:
     Class that carries out the error correction process.
     """
 
-    def __init__(self, labeling_budget: int, classification_model: str, clean_with_user_input: bool, feature_generators: List[str],
-                 vicinity_orders: List[int], vicinity_feature_generator: str, auto_instance_cache_model: bool,
-                 n_best_pdeps: int, training_time_limit: int,
-                 synth_tuples: int, synth_cleaning_threshold: float,
-                 test_synth_data_direction: str, pdep_features: Tuple[str], gpdep_threshold: float, fd_feature: str,
-                 domain_model_threshold: float, dataset_analysis: bool = False):
+    def __init__(self,
+                 labeling_budget: int,
+                 classification_model: str = 'ABC',
+                 clean_with_user_input: bool = True,
+                 feature_generators: List[str] = ['auto_instance', 'fd', 'llm_correction', 'llm_master'],
+                 vicinity_orders: List[int] = [1],
+                 vicinity_feature_generator: str = 'naive',
+                 auto_instance_cache_model: bool = False,
+                 n_best_pdeps: int = 3,
+                 training_time_limit: int = 30,
+                 synth_tuples: int = 100,
+                 synth_cleaning_threshold: float = 0.9,
+                 test_synth_data_direction: str = 'user_data',
+                 pdep_features: Tuple[str] = ('pr',),
+                 gpdep_threshold: float = 0.3,
+                 fd_feature: str = 'norm_gpdep',
+                 domain_model_threshold: float = 0.01,
+                 dataset_analysis: bool = False):
         """
         Parameters of the cleaning experiment.
         @param labeling_budget: How many tuples are labeled by the user. In the Baran publication, 20  labels are frequently used.
