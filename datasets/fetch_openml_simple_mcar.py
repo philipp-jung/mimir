@@ -5,7 +5,7 @@ from collections import Counter
 
 import pandas as pd
 from sklearn.datasets import fetch_openml
-from helpers import simple_mcar, validate_export
+from helpers import apply_corruption, validate_export
 
 random.seed(0)
 openml_ids_binary = [725, 310, 1046, 823, 137, 42493, 4135, 251, 151, 40922]
@@ -57,9 +57,9 @@ def fetch_corrupt_dataset(data_id: int) -> Tuple[List[Dict], List[str]]:
     metadata = []
     dtypes = [str(x) for x in df.dtypes.values]
 
-    corruption_name = "simple_mcar"
+    corruption_name = "mcar"
     for fraction in fractions:
-        df_corrupted = simple_mcar(df, fraction)
+        df_corrupted = apply_corruption(corruption_name, df, fraction)
         metadata.append(
             {
                 "dataset_id": data_id,
