@@ -108,3 +108,22 @@ def apply_corruption(mechanism: str, df: pd.DataFrame, fraction: float) -> pd.Da
         df_dirty.iloc[:, col] = se_dirty
 
     return df_dirty
+
+
+def apply_imputer_corruption(mechanism: str, df: pd.DataFrame, se: pd.Series, fraction: float) -> pd.Series:
+    """
+    Insert missing values into a column `se`. 
+    """
+    col = df.columns.get_loc(se.name)
+
+    if mechanism == 'imputer_simple_mcar':
+        error_positions = mcar_column(se, fraction)
+    elif mechanism == 'imputer_simple_mar':
+        error_positions = mar_column(df, se, fraction, col)
+    elif mechanism == 'imputer_simple_mnar':
+        error_positions = mnar_column(se, fraction)
+    else:
+        raise ValueError(f'Unknown missingness mechanism {mechanism}.')
+    se_dirty = corrupt_column(se, error_positions)
+
+    return se_dirty
