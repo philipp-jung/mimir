@@ -62,15 +62,11 @@ def fetch_corrupt_imputer_dataset(data_id: int) -> Tuple[List[Dict], List[str]]:
     metadata = []
     dtypes = [str(x) for x in df.dtypes.values]
 
-    #for corruption_name in ["imputer_simple_mcar", "imputer_simple_mar", "imputer_simple_mnar"]:
-    for corruption_name in ["imputer_simple_mcar"]:
+    for corruption_name in ["imputer_simple_mcar", "imputer_simple_mar", "imputer_simple_mnar"]:
         for fraction in fractions:
             se_corrupted = apply_imputer_corruption(corruption_name, df, se_target, fraction)
             df_corrupted = df.copy()
-            if data_id == 43572:
-                df_corrupted['Year'] = se_corrupted
-            else:
-                df_corrupted.iloc[:, -1] = se_corrupted
+            df_corrupted[se_corrupted.name] = se_corrupted
 
             metadata.append(
                 {
@@ -142,7 +138,6 @@ if __name__ == "__main__":
     metadatas = []
     all_dtypes = []
     for dataset_id in openml_ids_binary:
-    #for dataset_id in [1046]:
         if args.imputer:
             metadata, dtypes = fetch_corrupt_imputer_dataset(dataset_id)
         else:
@@ -151,7 +146,6 @@ if __name__ == "__main__":
         metadata = [{**x, "dataset_type": "binary classification"} for x in metadata]
         metadatas.extend(metadata)
     for dataset_id in openml_ids_multiclass:
-    #for dataset_id in []:
         if args.imputer:
             metadata, dtypes = fetch_corrupt_imputer_dataset(dataset_id)
         else:
