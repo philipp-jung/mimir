@@ -96,11 +96,11 @@ def apply_corruption(mechanism: str, df: pd.DataFrame, fraction: float) -> pd.Da
     for col in range(n_cols):
         fraction_col = fraction / n_cols
         se = df_dirty.iloc[:, col]
-        if mechanism == 'mcar':
+        if mechanism == 'simple_mcar':
             error_positions = mcar_column(se, fraction_col)
-        elif mechanism == 'mar':
+        elif mechanism == 'simple_mar':
             error_positions = mar_column(df_dirty, se, fraction_col, col)
-        elif mechanism == 'mnar':
+        elif mechanism == 'simple_mnar':
             error_positions = mnar_column(se, fraction_col)
         else:
             raise ValueError(f'Unknown missingness mechanism {mechanism}.')
