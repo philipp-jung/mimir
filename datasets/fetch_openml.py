@@ -57,21 +57,22 @@ def fetch_corrupt_dataset(data_id: int) -> Tuple[List[Dict], List[str]]:
     metadata = []
     dtypes = [str(x) for x in df.dtypes.values]
 
-    corruption_name = "mcar"
-    for fraction in fractions:
-        df_corrupted = apply_corruption(corruption_name, df, fraction)
-        metadata.append(
-            {
-                "dataset_id": data_id,
-                "corruption_name": corruption_name,
-                "fraction": fraction,
-            }
-        )
+    #for corruption_name in ["mcar", "mar", "mnar"]:
+    for corruption_name in ["mnar"]:
+        for fraction in fractions:
+            df_corrupted = apply_corruption(corruption_name, df, fraction)
+            metadata.append(
+                {
+                    "dataset_id": data_id,
+                    "corruption_name": corruption_name,
+                    "fraction": fraction,
+                }
+            )
 
-        clean_path, corrupt_path = dataset_paths(data_id, corruption_name, fraction)
-        df_corrupted.to_parquet(str(corrupt_path) + ".parquet", index=False)
-        df_corrupted.to_csv(str(corrupt_path) + ".csv", index=False)
-        validate_export(str(corrupt_path), df_corrupted, df, fraction)
+            clean_path, corrupt_path = dataset_paths(data_id, corruption_name, fraction)
+            df_corrupted.to_parquet(str(corrupt_path) + ".parquet", index=False)
+            df_corrupted.to_csv(str(corrupt_path) + ".csv", index=False)
+            validate_export(str(corrupt_path), df_corrupted, df, fraction)
 
     return metadata, dtypes
 
