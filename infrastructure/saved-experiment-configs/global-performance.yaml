@@ -89,6 +89,10 @@ ranges_openml:
   error_class:
     - "simple_mcar"
     - "imputer_simple_mcar"
+    - "simple_mnar"
+    - "imputer_simple_mnar"
+    - "simple_mar"
+    - "imputer_simple_mar"
 
 config_openml:
   dataset: "1481"
