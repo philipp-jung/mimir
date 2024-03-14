@@ -41,14 +41,18 @@ class Dataset:
         openml_dataset_ids = ["725", "310", "1046", "823", "137", "42493", "4135", "251", "151", "40922", "40498", "30", "1459", "1481", "184", "375", "32", "41027", "6", "40685", "43572"]
         hpi_dataset_ids = ["cddb"]
         renuver_dataset_ids = ["bridges", "cars", "glass", "restaurant"]
-        baran_dataset_ids = ["beers", "flights", "hospital", "tax", "rayyan", "toy", "debug", "synth-debug"]
+        baran_dataset_ids = ["beers", "flights", "hospital", "tax", "rayyan", "toy", "debug", "synth-debug", "food"]
         uci_dataset_ids = ["adult", "breast-cancer", "letter", "nursery"]
 
         if dataset_name in baran_dataset_ids:
             self.path = f"../datasets/{dataset_name}/dirty.csv"
             self.clean_path = f"../datasets/{dataset_name}/clean.csv"
-            self.parquet_path = self.path  # no parquet file is available.
-            self.typed_clean_path = self.clean_path  # no parquet file is available.
+            if dataset_name == 'food':
+                self.parquet_path = f"../datasets/{dataset_name}/dirty.parquet"
+                self.typed_clean_path = f"../datasets/{dataset_name}/clean.parquet"
+            else:
+                self.parquet_path = self.path  # no parquet file is available.
+                self.typed_clean_path = self.clean_path  # no parquet file is available.
             self.name = dataset_name
 
         elif dataset_name in renuver_dataset_ids:

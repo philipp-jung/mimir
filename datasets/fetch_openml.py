@@ -105,7 +105,7 @@ def fetch_corrupt_dataset(data_id: int) -> Tuple[List[Dict], List[str]]:
     metadata = []
     dtypes = [str(x) for x in df.dtypes.values]
 
-    for corruption_name in ["imputer_simple_mcar", "imputer_simple_mar", "imputer_simple_mnar"]:
+    for corruption_name in ["simple_mcar", "simple_mar", "simple_mnar"]:
         for fraction in fractions:
             df_corrupted = apply_corruption(corruption_name, df, fraction)
             metadata.append(

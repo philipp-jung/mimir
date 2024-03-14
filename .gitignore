@@ -22,3 +22,6 @@ infrastructure/jobs/
 
 # in-detail analysis 
 src/analysis/
+
+# cached stuff
+tmp/*
