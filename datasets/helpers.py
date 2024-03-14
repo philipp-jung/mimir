@@ -39,13 +39,11 @@ def mcar_column(se: pd.Series, fraction: float) -> list:
     return error_positions
 
 
-def mar_column(df: pd.DataFrame, se: pd.Series, fraction: float, column: int) -> list:
+def mar_column(df: pd.DataFrame, se: pd.Series, fraction: float, depends_on_col: int):
     n_rows = se.shape[0]
     n_values_to_discard = int(n_rows * fraction)
     perc_lower_start = np.random.randint(0, n_rows - n_values_to_discard)
     perc_idx = range(perc_lower_start, perc_lower_start + n_values_to_discard)
-    depends_on_col = np.random.choice(list(set(list(range(df.shape[1]))) - {column}))
-    # pick a random percentile of values in other column
     error_positions = list(df.iloc[:, depends_on_col].sort_values().iloc[perc_idx].index)
     return error_positions
         
@@ -56,7 +54,7 @@ def mnar_column(se: pd.Series, fraction: float) -> list:
     perc_idx = range(perc_lower_start, perc_lower_start + n_values_to_discard)
 
     # pick a random percentile of values in this column
-    error_positions = list(se.sort_values().iloc[perc_idx].index)
+    error_positions = se.sort_values(ascending=False).iloc[perc_idx].index
     return error_positions
 
 
@@ -92,6 +90,8 @@ def apply_corruption(mechanism: str, df: pd.DataFrame, fraction: float) -> pd.Da
     df_dirty = df.copy()
     _, n_cols = df.shape
 
+    # Column on which missing value distribution depends. Needs to be constant.
+    depends_on_col = np.random.choice(list(range(n_cols)))
 
     for col in range(n_cols):
         fraction_col = fraction / n_cols
@@ -99,14 +99,18 @@ def apply_corruption(mechanism: str, df: pd.DataFrame, fraction: float) -> pd.Da
         if mechanism == 'simple_mcar':
             error_positions = mcar_column(se, fraction_col)
         elif mechanism == 'simple_mar':
-            error_positions = mar_column(df_dirty, se, fraction_col, col)
+            fraction_col = fraction / (n_cols - 1)  # do not generate errors for depends_on_col
+            error_positions = mar_column(df_dirty, se, fraction_col, depends_on_col)
         elif mechanism == 'simple_mnar':
             error_positions = mnar_column(se, fraction_col)
         else:
             raise ValueError(f'Unknown missingness mechanism {mechanism}.')
         se_dirty = corrupt_column(se, error_positions)
-        df_dirty.iloc[:, col] = se_dirty
 
+        # Using MAR, we do not corrupt the column on which the other column's missing
+        # value distributions depend.
+        if not (mechanism == 'simple_mar' and col == depends_on_col):
+            df_dirty.iloc[:, col] = se_dirty
     return df_dirty
 
 

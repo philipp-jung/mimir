@@ -43,7 +43,7 @@ def fetch_corrupt_imputer_dataset(data_id: int) -> Tuple[List[Dict], List[str]]:
     """
     res = fetch_openml(data_id=data_id, as_frame=True, parser='auto')
 
-    df = res["frame"]
+    df = res["frame"].iloc[:1000, :].copy()
     se_target = res["target"]
     if data_id == 43572:
         df.columns = [x.replace('(', '').replace(')', '') for x in df.columns]
@@ -55,6 +55,7 @@ def fetch_corrupt_imputer_dataset(data_id: int) -> Tuple[List[Dict], List[str]]:
         se_target = df['Year']
     if se_target is None:
         raise ValueError('OpenML dataset comes without target, specify one manually.')
+    se_target = se_target.iloc[:1000]
 
     clean_path, _ = dataset_paths(data_id, "", 0)
     df.to_csv(str(clean_path) + '.csv', index=False)
@@ -91,7 +92,7 @@ def fetch_corrupt_dataset(data_id: int) -> Tuple[List[Dict], List[str]]:
     """
     res = fetch_openml(data_id=data_id, as_frame=True, parser='auto')
 
-    df = res["frame"]
+    df = res["frame"].iloc[:1000, :].copy()
     if data_id == 43572:
         df.columns = [x.replace('(', '').replace(')', '') for x in df.columns]
         df['Actors'].fillna('', inplace=True)

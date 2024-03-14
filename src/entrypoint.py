@@ -89,7 +89,7 @@ def combine_configs(ranges: dict, config: dict, runs: int):
     return configs
 
 
-def load_dedicated_experiments(saved_config: str) -> list[dict]:
+def load_dedicated_experiments(saved_config: str):
     config_path = Path('../infrastructure/saved-experiment-configs') / f'{saved_config}.yaml'
     with open(config_path, 'rt') as f:
         config = yaml.safe_load(f)

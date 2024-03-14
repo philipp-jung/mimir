@@ -24,4 +24,7 @@ infrastructure/jobs/
 src/analysis/
 
 # cached stuff
-tmp/*
+src/tmp/*
+
+# measurement results
+src/measurements/*

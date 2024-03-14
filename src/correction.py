@@ -863,11 +863,11 @@ if __name__ == "__main__":
     # store results for detailed analysis
     dataset_analysis = True
 
-    dataset_name = "151"
-    error_class = 'simple_mcar'
+    dataset_name = "food"
+    error_class = 'simple_mnar'
     error_fraction = 5
     version = 1
-    n_rows = 1000
+    n_rows = None
 
     labeling_budget = 20
     synth_tuples = 100
@@ -876,8 +876,8 @@ if __name__ == "__main__":
     clean_with_user_input = True  # Careful: If set to False, d.corrected_cells will remain empty.
     gpdep_threshold = 0.3
     training_time_limit = 30
-    feature_generators = ['auto_instance', 'fd', 'llm_correction', 'llm_master']
-    #feature_generators = ['llm_correction']
+    #feature_generators = ['auto_instance', 'fd', 'llm_correction', 'llm_master']
+    feature_generators = ['auto_instance', 'fd']
     classification_model = "ABC"
     fd_feature = 'norm_gpdep'
     vicinity_orders = [1]
