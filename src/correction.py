@@ -26,8 +26,17 @@ import hpo
 import helpers
 import ml_helpers
 
-if not logging.getLogger().hasHandlers():
+root_logger = logging.getLogger()
+# Check if there are no handlers attached to the root logger
+if not root_logger.hasHandlers():
+    # Configure logging with your debug logging settings
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+else:
+    # Modify existing logging configuration to include debug logging settings
+    root_logger.setLevel(logging.DEBUG)
+    # Update format for existing handlers
+    for handler in root_logger.handlers:
+        handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 
 class Cleaning:
     """
@@ -890,7 +899,7 @@ class Cleaning:
 
 if __name__ == "__main__":
     # store results for detailed analysis
-    dataset_analysis = True
+    dataset_analysis = False
 
     dataset_name = "tax"
     error_class = 'simple_mnar'
