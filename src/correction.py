@@ -26,6 +26,8 @@ import hpo
 import helpers
 import ml_helpers
 
+if not logging.getLogger().hasHandlers():
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class Cleaning:
     """
@@ -106,6 +108,7 @@ class Cleaning:
         self.DATASET_ANALYSIS = dataset_analysis
         self.MAX_VALUE_LENGTH = 50
         self.LABELING_BUDGET = labeling_budget
+        self.logger = logging.getLogger(__name__)
 
         # TODO remove unused attributes
         self.IGNORE_SIGN = "<<<IGNORE_THIS_VALUE>>>"
@@ -334,7 +337,7 @@ class Cleaning:
         If correction suggestions have been made for all cells, we sample from error cells that have not been
         sampled before.
         """
-        logging.debug('Start tuple sampling.')
+        self.logger.debug('Start tuple sampling.')
         rng = np.random.default_rng(seed=random_seed)
         remaining_column_unlabeled_cells = {}
         remaining_column_unlabeled_cells_error_values = {}
@@ -377,7 +380,7 @@ class Cleaning:
         # print(np.argwhere(tuple_score == np.amax(tuple_score)).flatten())
         d.sampled_tuple = rng.choice(np.argwhere(tuple_score == np.amax(tuple_score)).flatten())
         self.sampled_tuples += 1
-        logging.debug('Finish tuple sampling.')
+        self.logger.debug('Finish tuple sampling.')
 
     def label_with_ground_truth(self, d):
         """
@@ -394,13 +397,13 @@ class Cleaning:
             if d.dataframe.iloc[cell] != d.clean_dataframe.iloc[cell]:
                 error_label = 1
             d.labeled_cells[cell] = [error_label, d.clean_dataframe.iloc[cell]]
-        logging.debug('Finished labeling with ground truth.')
+        self.logger.debug('Finished labeling with ground truth.')
 
     def update_models(self, d):
         """
         This method updates the error corrector models with a new labeled tuple.
         """
-        logging.debug('Start updating models.')
+        self.logger.debug('Start updating models.')
         cleaned_sampled_tuple = []
         for column in range(d.dataframe.shape[1]):
             clean_cell = d.labeled_cells[(d.sampled_tuple, column)][1]
@@ -439,7 +442,7 @@ class Cleaning:
         logging.debug('Finish updating models.')
 
         if self.VERBOSE:
-            logging.info("The user labeled an additional tuple: {}.".format(d.sampled_tuple))
+            self.logger.info("The user labeled an additional tuple: {}.".format(d.sampled_tuple))
 
     def _feature_generator_process(self, args) -> List[Tuple[Tuple[int, int], str, Union[str, None]]]:
         """
@@ -601,13 +604,13 @@ class Cleaning:
                 d.inv_vicinity_gpdeps[order] = pdep.invert_and_sort_gpdeps(vicinity_gpdeps)
 
         if 'fd' in self.FEATURE_GENERATORS:
-            logging.debug('Start FD profiling.')
+            self.logger.debug('Start FD profiling.')
             # calculate FDs
             inputted_rows = list(d.labeled_tuples.keys())
             df_user_input = d.clean_dataframe.iloc[inputted_rows, :]  # careful, this is ground truth.
             df_clean_iterative = pdep.cleanest_version(d.dataframe, df_user_input)
             d.fds = pdep.mine_fds(df_clean_iterative, d.clean_dataframe)
-            logging.debug('Profiled FDs.')
+            self.logger.debug('Profiled FDs.')
 
             # calculate gpdeps
             shape = d.dataframe.shape
@@ -615,7 +618,7 @@ class Cleaning:
             row_errors = error_positions.updated_row_errors()
             d.fd_counts_dict, lhs_values_frequencies = pdep.mine_fd_counts(d.dataframe, row_errors, d.fds)
             gpdeps = pdep.fd_calc_gpdeps(d.fd_counts_dict, lhs_values_frequencies, shape, row_errors)
-            logging.debug('Calculated gpdeps.')
+            self.logger.debug('Calculated gpdeps.')
 
             d.fd_inverted_gpdeps = {}
             for lhs in gpdeps:
@@ -637,10 +640,10 @@ class Cleaning:
                                                                             pdep_tuple.gpdep,
                                                                             pdep_tuple.epdep,
                                                                             pdep_tuple.gpdep / norm_sum)
-            logging.debug('')
+            self.logger.debug('')
 
         if 'auto_instance' in self.FEATURE_GENERATORS and len(d.labeled_tuples) == self.LABELING_BUDGET:
-            logging.debug('Start training DataWig Models.')
+            self.logger.debug('Start training DataWig Models.')
             # simulate user input by reading labeled data from the typed dataframe
             inputted_rows = list(d.labeled_tuples.keys())
             typed_user_input = d.typed_clean_dataframe.iloc[inputted_rows, :]
@@ -652,12 +655,12 @@ class Cleaning:
                                                    time_limit=self.TRAINING_TIME_LIMIT,
                                                    use_cache=self.AUTO_INSTANCE_CACHE_MODEL)
                 if imp is not None:
-                    logging.debug(f'Trained DataWig model for column {col} ({i_col}).')
+                    self.logger.debug(f'Trained DataWig model for column {col} ({i_col}).')
                     d.imputer_models[i_col] = imp.predict_proba(d.typed_dataframe)
-                    logging.debug(f'Used DataWig model to infer values for column {col} ({i_col}).')
+                    self.logger.debug(f'Used DataWig model to infer values for column {col} ({i_col}).')
                 else:
                     d.imputer_models[i_col] = None
-                    logging.debug(f'Failed to train a DataWig model for column {col} ({i_col}).')
+                    self.logger.debug(f'Failed to train a DataWig model for column {col} ({i_col}).')
 
     def generate_features(self, d, synchronous):
         """
@@ -668,18 +671,18 @@ class Cleaning:
 
         # generate all features but the llm-features
         if not synchronous:
-            logging.debug('Start asynchronous user feature generation.')
+            self.logger.debug('Start asynchronous user feature generation.')
             pool = multiprocessing.Pool()
             prompt_lists = pool.map(self._feature_generator_process, process_args_list)
             pool.close()
             for l in prompt_lists:
                 ai_prompts.extend(l)
-            logging.debug('Finish asynchronous user feature generation.')
+            self.logger.debug('Finish asynchronous user feature generation.')
         else:
-            logging.debug('Start synchronous user feature generation.')
+            self.logger.debug('Start synchronous user feature generation.')
             for args in process_args_list:
                 ai_prompts.extend(self._feature_generator_process(args))
-            logging.debug('Finish synchronous user feature generation.')
+            self.logger.debug('Finish synchronous user feature generation.')
 
         # generate llm-features
         if len(d.labeled_tuples) == self.LABELING_BUDGET:
@@ -689,7 +692,7 @@ class Cleaning:
                 d.corrections.get(model_name)[error_cell] = correction_dicts
 
         if self.VERBOSE:
-            logging.info("User Features Generated.")
+            self.logger.info("User Features Generated.")
 
     def generate_inferred_features(self, d, synchronous):
         """
@@ -717,18 +720,18 @@ class Cleaning:
             ai_prompts: List[Tuple[Tuple[int, int], str, Union[str, None]]] = []
 
             if not synchronous:
-                logging.debug('Start asynchronous inferred feature generation.')
+                self.logger.debug('Start asynchronous inferred feature generation.')
                 pool = multiprocessing.Pool()
                 prompt_lists = pool.map(self._feature_generator_process, synth_args_list)
                 pool.close()
                 for l in prompt_lists:
                     ai_prompts.extend(l)
-                logging.debug('Finish asynchronous inferred feature generation.')
+                self.logger.debug('Finish asynchronous inferred feature generation.')
             else:
-                logging.debug('Start synchronous inferred feature generation.')
+                self.logger.debug('Start synchronous inferred feature generation.')
                 for args in synth_args_list:
                     ai_prompts.extend(self._feature_generator_process(args))
-                logging.debug('Finish synchronous inferred feature generation.')
+                self.logger.debug('Finish synchronous inferred feature generation.')
 
             # Stub to get llm_master to work in unsupervised setup.
             #
@@ -746,14 +749,14 @@ class Cleaning:
             #         d.inferred_corrections.get(model_name)[error_cell] = correction_dicts
 
             if self.VERBOSE:
-                logging.info("Inferred Features Generated.")
+                self.logger.info("Inferred Features Generated.")
 
 
     def binary_predict_corrections(self, d):
         """
         The ML problem as formulated in the Baran paper.
         """
-        logging.debug('Start training meta learner.')
+        self.logger.debug('Start training meta learner.')
         error_positions = helpers.ErrorPositions(d.detected_cells, d.dataframe.shape, d.labeled_cells)
         column_errors = error_positions.original_column_errors()
         pair_features = d.corrections.assemble_pair_features()
@@ -805,7 +808,7 @@ class Cleaning:
                 predicted_probas = [x[1] for x in gs_clf.predict_proba(x_test)]
 
             ml_helpers.set_binary_cleaning_suggestions(predicted_labels, predicted_probas, x_test, error_correction_suggestions, d.corrected_cells)
-            logging.debug('Finish inferring corrections.')
+            self.logger.debug('Finish inferring corrections.')
 
         if self.LABELING_BUDGET == len(d.labeled_tuples) and self.DATASET_ANALYSIS:
             samples = {c: random.sample(column_errors[c], min(40, len(column_errors[c]))) for c in column_errors}
@@ -829,7 +832,7 @@ class Cleaning:
                 json.dump(analysis, f)
 
         if self.VERBOSE:
-            logging.info("{:.0f}% ({} / {}) of data errors are corrected.".format(
+            self.logger.info("{:.0f}% ({} / {}) of data errors are corrected.".format(
                 100 * len(d.corrected_cells) / len(d.detected_cells),
                 len(d.corrected_cells), len(d.detected_cells)))
 
@@ -838,13 +841,13 @@ class Cleaning:
         User input ideally contains completely correct data. It should be leveraged for optimal cleaning
         performance.
         """
-        logging.debug('Start cleaning with user input')
+        self.logger.debug('Start cleaning with user input')
         if not self.CLEAN_WITH_USER_INPUT:
             return None
         for error_cell in d.detected_cells:
             if error_cell in d.labeled_cells:
                 d.corrected_cells[error_cell] = d.labeled_cells[error_cell][1]
-        logging.debug('Finish cleaning with user input')
+        self.logger.debug('Finish cleaning with user input')
 
     def store_results(self, d):
         """
@@ -864,7 +867,7 @@ class Cleaning:
             raise ValueError('There are no errors in the data to correct.')
         if self.VERBOSE:
             text = f"Start Mimir To Correct Dataset {d.name}"
-            logging.info(f"{text}\n")
+            self.logger.info(f"{text}\n")
         self.initialize_models(d)
 
         while len(d.labeled_tuples) <= self.LABELING_BUDGET:
@@ -879,15 +882,13 @@ class Cleaning:
 
             if self.VERBOSE:
                 p, r, f = d.get_data_cleaning_evaluation(d.corrected_cells)[-3:]
-                logging.info(
+                self.logger.info(
                     "Cleaning performance on {}:\nPrecision = {:.2f}\nRecall = {:.2f}\nF1 = {:.2f}\n".format(d.name, p, r,
                                                                                                            f))
         return d.corrected_cells
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG,  # Set the logging level to DEBUG
-                        format='%(asctime)s - %(levelname)s - %(message)s')  # Define log format
     # store results for detailed analysis
     dataset_analysis = True
 
