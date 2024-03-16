@@ -625,7 +625,9 @@ class Cleaning:
             shape = d.dataframe.shape
             error_positions = helpers.ErrorPositions(d.detected_cells, shape, d.labeled_cells)
             row_errors = error_positions.updated_row_errors()
+            self.logger.debug('Calculated error positions.')
             d.fd_counts_dict, lhs_values_frequencies = pdep.mine_fd_counts(d.dataframe, row_errors, d.fds)
+            self.logger.debug('Mined FD counts.')
             gpdeps = pdep.fd_calc_gpdeps(d.fd_counts_dict, lhs_values_frequencies, shape, row_errors)
             self.logger.debug('Calculated gpdeps.')
 
