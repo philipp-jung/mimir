@@ -626,7 +626,8 @@ class Cleaning:
             error_positions = helpers.ErrorPositions(d.detected_cells, shape, d.labeled_cells)
             row_errors = error_positions.updated_row_errors()
             self.logger.debug('Calculated error positions.')
-            d.fd_counts_dict, lhs_values_frequencies = pdep.mine_fd_counts(d.dataframe, row_errors, d.fds)
+            #d.fd_counts_dict, lhs_values_frequencies = pdep.mine_fd_counts(d.dataframe, row_errors, d.fds)
+            d.fd_counts_dict, lhs_values_frequencies = pdep.fast_fd_counts(d.dataframe, row_errors, d.fds)
             self.logger.debug('Mined FD counts.')
             gpdeps = pdep.fd_calc_gpdeps(d.fd_counts_dict, lhs_values_frequencies, shape, row_errors)
             self.logger.debug('Calculated gpdeps.')
@@ -903,11 +904,11 @@ if __name__ == "__main__":
     # store results for detailed analysis
     dataset_analysis = False
 
-    dataset_name = "tax"
+    dataset_name = "flights"
     error_class = 'simple_mnar'
     error_fraction = 5
     version = 1
-    n_rows = 100000
+    n_rows = None
 
     labeling_budget = 20
     synth_tuples = 100
@@ -916,8 +917,8 @@ if __name__ == "__main__":
     clean_with_user_input = True  # Careful: If set to False, d.corrected_cells will remain empty.
     gpdep_threshold = 0.3
     training_time_limit = 30
-    #feature_generators = ['auto_instance', 'fd', 'llm_correction', 'llm_master']
-    feature_generators = ['auto_instance', 'fd']
+    feature_generators = ['auto_instance', 'fd', 'llm_correction', 'llm_master']
+    #feature_generators = ['auto_instance', 'fd']
     classification_model = "ABC"
     fd_feature = 'norm_gpdep'
     vicinity_orders = [1]

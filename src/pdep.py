@@ -19,6 +19,33 @@ def calculate_frequency(df: pd.DataFrame, col: int):
     return counts.to_dict()
 
 
+def fast_fd_counts(
+    df: pd.DataFrame,
+    row_errors: Dict[int, List[Tuple[int, int]]],
+    fds: List[FDTuple],
+) -> Tuple[Dict[Tuple[int], Dict[int, pd.Series]], defaultdict[Tuple[int], Dict[int, pd.Series]]]:
+    
+    lhs_values = defaultdict(lambda: defaultdict(dict))
+
+    d = {fd.lhs: {} for fd in fds}
+    for fd in fds:
+        d[fd.lhs][fd.rhs] = {}
+
+    for fd in fds:
+        fd_cols = set([*fds[0].lhs, fds[0].rhs])  # columns the FD concerns
+        error_cols_per_row = {row: set([col for _, col in row_errors[row]]) for row in row_errors}  # for each row, columns that contain errors
+        rows_to_drop = [row for row, cols in error_cols_per_row.items() if not fd_cols.isdisjoint(cols)]
+                        
+        lhs, rhs = [df.columns[x] for x in fd.lhs], df.columns[fd.rhs]
+        df_clean = df.drop(rows_to_drop)  # drop rows that contain errors in lhs or rhs
+
+        lhs_values[fd.lhs][fd.rhs] = df_clean.groupby(lhs)[lhs].value_counts()
+        fd_counts = df_clean.groupby(lhs)[rhs].value_counts()
+        d[fd.lhs][fd.rhs] = fd_counts
+
+    return d, lhs_values
+
+
 def mine_fd_counts(
     df: pd.DataFrame,
     row_errors: Dict[int, Dict[Tuple, str]],
@@ -178,13 +205,20 @@ def expected_pdep(
     if n_rows == 1:  # division by 0
         return 0
 
-    n_distinct_values_A = len(counts_dict[A][B])
+    lhs_cols = counts_dict[A][B].index.names[:-1]
+    rhs_col = counts_dict[A][B].index.names[-1]
+
+    n_distinct_values_A = len(counts_dict[A][B]
+                             .reset_index()  # convert Multiindex to dataframe
+                             .loc[:, lhs_cols]  # select LHS
+                             .drop_duplicates()
+                             ) 
     return pdep_B + (n_distinct_values_A - 1) / (n_rows - 1) * (1 - pdep_B)
 
 
 def error_corrected_row_count(
     n_rows: int,
-    row_errors: Dict[int, Tuple[int, int]],
+    row_errors: Dict[int, List[Tuple[int, int]]],
     A: Tuple[int, ...],
     B: int
 ) -> int:
@@ -216,23 +250,20 @@ def pdep_0(
 ) -> Union[float, None]:
     """
     Calculate pdep(B), that is the probability that two randomly selected records from B will have the same value.
-    Note that in order to calculate pdep(B), you may want to limit the records from B to error-free records in
-    context of a left hand side A, for example when calculating pdep(B) to calculate gpdep(A,B).
+    Note that we calculate pdep(B) in the context calculating gpdep(A,B), and that we thus must limit the records
+    from B to records that do not contain errors in A or B.
+    That's why you also need to specify A to calculate pdep(B) using pdep_0().
     """
     if n_rows == 0:  # no tuple exists without an error in lhs and rhs
         return None
 
-    # calculate the frequency of each RHS value, given that the values in all columns covered by LHS and RHS contain
-    # no error.
-    rhs_abs_frequencies = defaultdict(int)
-    for lhs_vals in counts_dict[A][B]:
-        for rhs_val in counts_dict[A][B][lhs_vals]:
-            rhs_abs_frequencies[rhs_val] += counts_dict[A][B][lhs_vals][rhs_val]
-
-    sum_components = []
-    for rhs_frequency in rhs_abs_frequencies.values():
-        sum_components.append(rhs_frequency**2)
-    return sum(sum_components) / n_rows**2
+    rhs_name = counts_dict[A][B].index.names[-1]
+    rhs_value_counts = (counts_dict[A][B]
+                        .reset_index()
+                        .groupby(rhs_name)
+                        .agg({'count': 'sum'})
+                        )
+    return ((rhs_value_counts ** 2).sum() / n_rows**2)['count']
 
 
 def pdep(
@@ -253,10 +284,13 @@ def pdep(
 
     sum_components = []
 
-    for lhs_val, rhs_dict in counts_dict[A][B].items():  # lhs_val same as A_i
+    for lhs_index, rhs_count in counts_dict[A][B].items():
+        rhs_val = lhs_index[-1]  # last value in lhs_index is the rhs-value
+        lhs_val = lhs_index[:-1]  # all other values in the lhs index are the lhs-values
+        if len(lhs_val) == 1:
+            lhs_val = lhs_val[0]
         lhs_counts = lhs_values_frequencies[A][B][lhs_val]  # same as a_i
-        for rhs_val, rhs_counts in rhs_dict.items():  # rhs_counts same as n_ij
-            sum_components.append(rhs_counts**2 / lhs_counts)
+        sum_components.append(rhs_count**2 / lhs_counts)
     return sum(sum_components) / n_rows
 
 
@@ -382,7 +416,7 @@ def fd_based_corrector(
     inverse_gpdeps: Dict[int, Dict[Tuple, PdepTuple]],
     counts_dict: dict,
     ed: dict,
-    feature: str = "pr"
+    feature: str = "norm_gpdep"
 ) -> Dict:
     """
     Leverage exact FDs and gpdep to make cleaning suggestions.
@@ -399,13 +433,10 @@ def fd_based_corrector(
         lhs_vals = tuple([ed["vicinity"][x] for x in lhs_cols])
 
         if rhs_col not in lhs_cols and lhs_vals in counts_dict[lhs_cols][rhs_col]:
-            sum_scores = sum(counts_dict[lhs_cols][rhs_col][lhs_vals].values())
             for rhs_val in counts_dict[lhs_cols][rhs_col][lhs_vals]:
-                pr = counts_dict[lhs_cols][rhs_col][lhs_vals][rhs_val] / sum_scores
 
                 results_list.append(
                     {"correction": rhs_val,
-                     "pr": pr,
                      "pdep": pdep_tuple.pdep if pdep_tuple is not None else 0,
                      "gpdep": pdep_tuple.gpdep if pdep_tuple is not None else 0,
                      "epdep": pdep_tuple.epdep if pdep_tuple is not None else 0,
