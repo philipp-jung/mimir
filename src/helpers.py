@@ -15,6 +15,12 @@ import dotenv
 dotenv.load_dotenv()
 openai.api_key = os.environ.get('OPENAI_API_KEY')
 
+@dataclass
+class LLMRequest:
+    cell: Tuple[int, int]
+    corrector_name: str
+    prompt: Union[str, None]
+
 
 @dataclass
 class ErrorPositions:
@@ -127,7 +133,7 @@ def connect_to_cache() -> sqlite3.Connection:
 
 def fetch_cached_llm(dataset: str,
                      error_cell: Tuple[int,int],
-                     prompt: str,
+                     prompt: Union[str, None],
                      correction_model_name: str,
                      error_fraction: Union[None, int] = None,
                      version: Union[None, int] = None,
@@ -213,7 +219,7 @@ def fetch_cache(dataset: str,
     return None
 
 
-def fetch_llm(prompt: str,
+def fetch_llm(prompt: Union[str, None],
               dataset: str,
               error_cell: Tuple[int, int],
               correction_model_name: str,
