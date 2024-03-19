@@ -719,6 +719,7 @@ class Cleaning:
                                       [self.PDEP_FEATURES for _ in range(len(d_list))],
                                       [self.GPDEP_THRESHOLD for _ in range(len(d_list))],
                                       [self.LABELING_BUDGET for _ in range(len(d_list))],
+                                      chunksize=100
                                       )
             self.logger.debug('Finish asynchronous user feature generation.')
         else:
@@ -959,11 +960,11 @@ if __name__ == "__main__":
     # store results for detailed analysis
     dataset_analysis = False
 
-    dataset_name = "flights"
+    dataset_name = "tax"
     error_class = 'simple_mnar'
     error_fraction = 5
     version = 1
-    n_rows = 100
+    n_rows = 10000
 
     labeling_budget = 20
     synth_tuples = 0

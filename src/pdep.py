@@ -1,6 +1,7 @@
 import os
 import platform
 import subprocess
+import concurrent.futures
 import pandas as pd
 from typing import Tuple, List, Dict, Union
 from itertools import combinations
@@ -23,9 +24,9 @@ def fast_fd_counts(
     df: pd.DataFrame,
     row_errors: Dict[int, List[Tuple[int, int]]],
     fds: List[FDTuple],
-) -> Tuple[Dict[Tuple[int], Dict[int, pd.Series]], defaultdict[Tuple[int], Dict[int, pd.Series]]]:
+) -> Tuple[Dict[Tuple[int], Dict[int, pd.Series]], Dict[Tuple[int], Dict[int, pd.Series]]]:
     
-    lhs_values = defaultdict(lambda: defaultdict(dict))
+    lhs_values = {}
 
     d = {fd.lhs: {} for fd in fds}
     for fd in fds:
@@ -39,6 +40,10 @@ def fast_fd_counts(
         lhs, rhs = [df.columns[x] for x in fd.lhs], df.columns[fd.rhs]
         df_clean = df.drop(rows_to_drop)  # drop rows that contain errors in lhs or rhs
 
+        if lhs_values.get(fd.lhs) is None:
+            lhs_values[fd.lhs] = {}
+        if lhs_values[fd.lhs].get(fd.rhs) is None:
+            lhs_values[fd.lhs][fd.rhs] = {}
         lhs_values[fd.lhs][fd.rhs] = df_clean.groupby(lhs)[lhs].value_counts()
         fd_counts = df_clean.groupby(lhs)[rhs].value_counts()
         d[fd.lhs][fd.rhs] = fd_counts
@@ -300,22 +305,24 @@ def gpdep(
     lhs_values_frequencies: dict,
     A: Tuple[int, ...],
     B: int,
-) -> Union[PdepTuple, None]:
+) -> Tuple[Tuple[int, ...], int, Union[PdepTuple, None]]:
     """
     Calculates the *genuine* probabilistic dependence (gpdep) between
     a left hand side A, which consists of one or more attributes, and
     a right hand side B, which consists of exactly one attribute.
+
+    Returns tuple of the form (lhs, rhs, PdepTuple)
     """
     if B in A:  # pdep([A,..],A) = 1
-        return None
+        return (A, B, None)
 
     pdep_A_B = pdep(n_rows, counts_dict, lhs_values_frequencies, A, B)
     epdep_A_B = expected_pdep(n_rows, counts_dict, A, B)
 
     if pdep_A_B is not None and epdep_A_B is not None:
         gpdep_A_B = pdep_A_B - epdep_A_B
-        return PdepTuple(pdep_A_B, gpdep_A_B, epdep_A_B, 0)
-    return None
+        return (A, B, PdepTuple(pdep_A_B, gpdep_A_B, epdep_A_B, 0))
+    return (A, B, None)
 
 
 def vicinity_based_corrector_order_n(counts_dict, ed) -> Dict[str, Dict[str, float]]:
@@ -351,7 +358,7 @@ def vicinity_based_corrector_order_n(counts_dict, ed) -> Dict[str, Dict[str, flo
 
 
 def fd_calc_gpdeps(
-    counts_dict: dict, lhs_values_frequencies: dict, shape: Tuple[int, int], row_errors
+    counts_dict: dict, lhs_values_frequencies: dict, shape: Tuple[int, int], row_errors, synchronous=False
 ) -> Dict[Tuple, Dict[int, PdepTuple]]:
     """
     Calculate all gpdeps in a given set of functional dependencies. The difference to calc_all_gpdeps
@@ -361,10 +368,20 @@ def fd_calc_gpdeps(
     lhss = list(counts_dict.keys())
 
     gpdeps = {lhs: {} for lhs in lhss}
-    for lhs in counts_dict:
-        for rhs in counts_dict[lhs]:
-            N = error_corrected_row_count(n_rows, row_errors, lhs, rhs)
-            gpdeps[lhs][rhs] = gpdep(N, counts_dict, lhs_values_frequencies, lhs, rhs)
+    if synchronous:
+        for lhs in counts_dict:
+            for rhs in counts_dict[lhs]:
+                N = error_corrected_row_count(n_rows, row_errors, lhs, rhs)
+                gpdeps[lhs][rhs] = gpdep(N, counts_dict, lhs_values_frequencies, lhs, rhs)
+    else:
+        arguments = [(error_corrected_row_count(n_rows, row_errors, lhs, rhs), counts_dict, lhs_values_frequencies, lhs, rhs) for lhs in counts_dict for rhs in counts_dict[lhs]]
+        #results = map(gpdep, *zip(*arguments))
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            results = executor.map(gpdep, *zip(*arguments), chunksize=100)
+
+    for r in results:
+        (lhs, rhs, gpdep_result) = r
+        gpdeps[lhs][rhs] = gpdep_result
     return gpdeps
 
 
