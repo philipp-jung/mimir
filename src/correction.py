@@ -705,7 +705,10 @@ class Cleaning:
         if not synchronous:
             self.logger.debug('Start asynchronous user feature generation.')
             d_list, cell_list, is_synth_list = zip(*process_args_list)
-            with concurrent.futures.ProcessPoolExecutor() as executor:
+            n_workers = multiprocessing.cpu_count() - 1
+            chunksize = len(d_list) // n_workers
+
+            with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
                 feature_results = executor.map(self._feature_generator_process,
                                       d_list,
                                       cell_list,
@@ -719,7 +722,7 @@ class Cleaning:
                                       [self.PDEP_FEATURES for _ in range(len(d_list))],
                                       [self.GPDEP_THRESHOLD for _ in range(len(d_list))],
                                       [self.LABELING_BUDGET for _ in range(len(d_list))],
-                                      chunksize=100
+                                      chunksize=chunksize
                                       )
             self.logger.debug('Finish asynchronous user feature generation.')
         else:
@@ -964,7 +967,7 @@ if __name__ == "__main__":
     error_class = 'simple_mnar'
     error_fraction = 5
     version = 1
-    n_rows = 10000
+    n_rows = 100000
 
     labeling_budget = 20
     synth_tuples = 0
