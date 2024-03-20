@@ -705,7 +705,7 @@ class Cleaning:
         if not synchronous:
             self.logger.debug('Start asynchronous user feature generation.')
             d_list, cell_list, is_synth_list = zip(*process_args_list)
-            n_workers = multiprocessing.cpu_count() - 1
+            n_workers = min(multiprocessing.cpu_count() - 1, 16)
             chunksize = len(d_list) // n_workers
 
             with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
