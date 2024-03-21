@@ -724,7 +724,7 @@ class Cleaning:
         if self.SYNTH_TUPLES > 0 and len(ranked_candidate_rows) > 0:
             # sample randomly to prevent sorted data messing up the sampling process.
             random.seed(0)
-            if len(ranked_candidate_rows) <= self.SYNTH_TUPLES:
+            if len(ranked_candidate_rows) >= self.SYNTH_TUPLES:
                 synthetic_error_rows = random.sample([x[0] for x in ranked_candidate_rows], len(ranked_candidate_rows))
             else:  # less clean rows available than inferred tuples requested, take all you get.
                 logging.info(f'Requested {self.SYNTH_TUPLES} tuples to inferr features from, but only {len(ranked_candidate_rows)} error-free tuples are available.')
