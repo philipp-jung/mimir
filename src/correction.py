@@ -28,6 +28,9 @@ import helpers
 import ml_helpers
 import correctors
 
+# sample randomly to prevent sorted data messing up the sampling process.
+random.seed(0)
+
 root_logger = logging.getLogger()
 # Check if there are no handlers attached to the root logger
 if not root_logger.hasHandlers():
@@ -623,7 +626,7 @@ class Cleaning:
             for cell in d.labeled_cells:
                 if cell in d.detected_cells:
                     error = d.detected_cells[cell]
-                    correction = d.labeled_cells[cell]
+                    correction = d.labeled_cells[cell][1]
                     if error != '':
                         if correction == '':  # encode missing value
                             correction = '<MV>'
@@ -722,14 +725,12 @@ class Cleaning:
         ranked_candidate_rows = sorted(candidate_rows, key=lambda x: x[1])
 
         if self.SYNTH_TUPLES > 0 and len(ranked_candidate_rows) > 0:
-            # sample randomly to prevent sorted data messing up the sampling process.
-            random.seed(0)
-            if len(ranked_candidate_rows) >= self.SYNTH_TUPLES:
-                synthetic_error_rows = random.sample([x[0] for x in ranked_candidate_rows], len(ranked_candidate_rows))
+            if len(ranked_candidate_rows) >= self.SYNTH_TUPLES:  # more candidate rows available than required, sample needed amount
+                synthetic_error_rows = random.sample([x[0] for x in ranked_candidate_rows], self.SYNTH_TUPLES)
             else:  # less clean rows available than inferred tuples requested, take all you get.
                 logging.info(f'Requested {self.SYNTH_TUPLES} tuples to inferr features from, but only {len(ranked_candidate_rows)} error-free tuples are available.')
-                logging.info(f'Sampling all {len(ranked_candidate_rows)} instead.')
-                synthetic_error_rows = random.sample([x[0] for x in ranked_candidate_rows[:self.SYNTH_TUPLES]], self.SYNTH_TUPLES)
+                logging.info(f'Sampling {len(ranked_candidate_rows)} rows instead.')
+                synthetic_error_rows = [x[0] for x in ranked_candidate_rows]
             synthetic_error_cells = [(i, j) for i in synthetic_error_rows for j in range(d.dataframe.shape[1])]
 
             synth_args_list = [[d, cell, True] for cell in synthetic_error_cells]
@@ -928,11 +929,11 @@ if __name__ == "__main__":
     # store results for detailed analysis
     dataset_analysis = False
 
-    dataset_name = "tax"
+    dataset_name = "flights"
     error_class = 'simple_mnar'
     error_fraction = 5
     version = 1
-    n_rows = 1000
+    n_rows = None
 
     labeling_budget = 20
     synth_tuples = 10
@@ -941,8 +942,8 @@ if __name__ == "__main__":
     clean_with_user_input = True  # Careful: If set to False, d.corrected_cells will remain empty.
     gpdep_threshold = 0.3
     training_time_limit = 30
-    feature_generators = ['auto_instance', 'fd', 'llm_correction', 'llm_master']
-    #feature_generators = ['auto_instance', 'fd']
+    #feature_generators = ['auto_instance', 'fd', 'llm_correction', 'llm_master']
+    feature_generators = ['fd']
     classification_model = "ABC"
     fd_feature = 'norm_gpdep'
     vicinity_orders = [1]
