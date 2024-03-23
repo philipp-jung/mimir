@@ -34,7 +34,7 @@ def fast_fd_counts(
         d[fd.lhs][fd.rhs] = {}
 
     for fd in fds:
-        fd_cols = set([*fds[0].lhs, fds[0].rhs])  # columns the FD concerns
+        fd_cols = set([*fd.lhs, fd.rhs])  # columns the FD concerns
         error_cols_per_row = {row: set([col for _, col in row_errors[row]]) for row in row_errors}  # for each row, columns that contain errors
         rows_to_drop = [row for row, cols in error_cols_per_row.items() if not fd_cols.isdisjoint(cols)]
                         
@@ -369,22 +369,19 @@ def fd_calc_gpdeps(
     lhss = list(counts_dict.keys())
 
     gpdeps = {lhs: {} for lhs in lhss}
+    arguments = [(error_corrected_row_count(n_rows, row_errors, lhs, rhs), counts_dict, lhs_values_frequencies, lhs, rhs) for lhs in counts_dict for rhs in counts_dict[lhs]]
     if synchronous:
-        for lhs in counts_dict:
-            for rhs in counts_dict[lhs]:
-                N = error_corrected_row_count(n_rows, row_errors, lhs, rhs)
-                gpdeps[lhs][rhs] = gpdep(N, counts_dict, lhs_values_frequencies, lhs, rhs)
+        results = map(gpdep, *zip(*arguments))
     else:
-        arguments = [(error_corrected_row_count(n_rows, row_errors, lhs, rhs), counts_dict, lhs_values_frequencies, lhs, rhs) for lhs in counts_dict for rhs in counts_dict[lhs]]
-        #results = map(gpdep, *zip(*arguments))
         n_workers = min(multiprocessing.cpu_count() - 1, 16)
         chunksize = len(arguments) // n_workers
         with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
             results = executor.map(gpdep, *zip(*arguments), chunksize=chunksize)
 
     for r in results:
-        (lhs, rhs, gpdep_result) = r
+        lhs, rhs, gpdep_result = r
         gpdeps[lhs][rhs] = gpdep_result
+
     return gpdeps
 
 
@@ -402,7 +399,7 @@ def calc_all_gpdeps(
     for lhs in lhss:
         for rhs in rhss:
             N = error_corrected_row_count(n_rows, row_errors, lhs, rhs)
-            gpdeps[lhs][rhs] = gpdep(N, counts_dict[order], lhs_values_frequencies[order], lhs, rhs)
+            lhs, rhs, gpdeps[lhs][rhs] = gpdep(N, counts_dict[order], lhs_values_frequencies[order], lhs, rhs)
     return gpdeps
 
 

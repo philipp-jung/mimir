@@ -23,8 +23,8 @@ def generate_pdep_features(cell: Tuple[int, int],
     for lhs_cols, pdep_tuple in gpdeps.items():
         lhs_values = tuple([row_values[x] for x in lhs_cols])
 
-        if rhs_col not in lhs_cols and lhs_values in counts_dict:
-            for rhs_val in counts_dict[lhs_values]:
+        if rhs_col not in lhs_cols and lhs_values in counts_dict[lhs_cols][rhs_col]:
+            for rhs_val in counts_dict[lhs_cols][rhs_col][lhs_values].index:
 
                 results_list.append(
                     {"correction": rhs_val,
@@ -52,6 +52,8 @@ def generate_pdep_features(cell: Tuple[int, int],
             if highest_conditional_probabilities.get(d["correction"]) is None:
                 highest_conditional_probabilities[d["correction"]] = d[feature]
 
+    if cell == (2,6):
+        a =1
     return {'cell': cell, 'corrector': 'fd', 'correction_dict': highest_conditional_probabilities}
 
 def generate_llm_correction_features(cell: Tuple[int, int],
@@ -93,7 +95,7 @@ def generate_llm_master_features(cell: Tuple[int, int],
     final_row_as_string, _ = helpers.error_free_row_to_prompt(df_row_with_error, 0, cell[1])
     prompt = prompt + final_row_as_string + '\n' + 'correction:'
 
-    correction, token_logprobs, top_logprobs = helpers.fetch_cached_llm(dataset_name, cell, prompt, 'llm_correction', error_fraction, version, error_class)
+    correction, token_logprobs, top_logprobs = helpers.fetch_cached_llm(dataset_name, cell, prompt, 'llm_master', error_fraction, version, error_class)
     correction_dict = helpers.llm_response_to_corrections(correction, token_logprobs, top_logprobs)
 
     return {'cell': cell, 'corrector': 'llm_master', 'correction_dict': correction_dict}
