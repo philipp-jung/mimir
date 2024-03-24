@@ -44,7 +44,7 @@ def run_mirmir(c: dict):
         )
         app.VERBOSE = False
         seed = None
-        correction_dictionary = app.run(data, seed)
+        correction_dictionary = app.run(data, seed, synchronous=False)
         end_time = time.time()
         p, r, f = data.get_data_cleaning_evaluation(correction_dictionary)[-3:]
         return {
