@@ -101,8 +101,7 @@ def generate_llm_master_features(cell: Tuple[int, int],
     return {'cell': cell, 'corrector': 'llm_master', 'correction_dict': correction_dict}
 
 
-def generate_datawig_features(cell: Tuple[int, int], df_probas: pd.DataFrame, error_value):
-    se_probas = df_probas.iloc[cell[0]]  # select error position
+def generate_datawig_features(cell: Tuple[int, int], se_probas: pd.Series, error_value):
     prob_d = {key: se_probas.to_dict()[key] for key in se_probas.to_dict()}
 
     # sometimes autogluon returns np.nan, which the ensemble classifier downstream chokes up on.

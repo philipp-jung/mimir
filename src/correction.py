@@ -544,7 +544,7 @@ class Cleaning:
             d.fd_counts_dict, lhs_values_frequencies = pdep.fast_fd_counts(d.dataframe, row_errors, d.fds)
             self.logger.debug('Mined FD counts.')
 
-            gpdeps = pdep.fd_calc_gpdeps(d.fd_counts_dict, lhs_values_frequencies, shape, row_errors, True)
+            gpdeps = pdep.fd_calc_gpdeps(d.fd_counts_dict, lhs_values_frequencies, shape, row_errors, False)
             self.logger.debug('Calculated gpdeps.')
 
             d.fd_inverted_gpdeps = {}
@@ -594,7 +594,7 @@ class Cleaning:
         Use correctors to generate correction features.
         """
         process_args_list = [[d, cell, False] for cell in d.detected_cells]
-        n_workers = min(multiprocessing.cpu_count() - 1, 16)
+        n_workers = min(multiprocessing.cpu_count() - 1, 24)
 
         self.logger.debug('Start user feature generation of Mimir Correctors.')
 
@@ -687,7 +687,8 @@ class Cleaning:
             for (row, col) in d.detected_cells:
                 df_probas = d.imputer_models.get(col)
                 if df_probas is not None:
-                    auto_instance_args.append([(row, col), df_probas, d.dataframe.iloc[row, col]])
+                    #auto_instance_args.append([(row, col), df_probas, d.dataframe.iloc[row, col]])
+                    auto_instance_args.append([(row, col), df_probas.iloc[row], d.dataframe.iloc[row, col]])
             if len(auto_instance_args) == 0:
                 datawig_results = []
             else:
@@ -724,6 +725,7 @@ class Cleaning:
         # determine error-free rows to sample from.
         candidate_rows = [(row, len(cells)) for row, cells in row_errors.items() if len(cells) == 0]
         ranked_candidate_rows = sorted(candidate_rows, key=lambda x: x[1])
+        n_workers = min(multiprocessing.cpu_count() - 1, 16)
 
         if self.SYNTH_TUPLES > 0 and len(ranked_candidate_rows) > 0:
             if len(ranked_candidate_rows) >= self.SYNTH_TUPLES:  # more candidate rows available than required, sample needed amount
@@ -746,7 +748,13 @@ class Cleaning:
                         local_counts_dict = {lhs_cols: d.fd_counts_dict[lhs_cols] for lhs_cols in gpdeps}  # save memory by subsetting counts_dict
                         row_values = list(d.dataframe.iloc[row, :])
                         fd_pdep_args.append([(row, col), local_counts_dict, gpdeps, row_values, self.FD_FEATURE])
-                fd_results = map(correctors.generate_pdep_features, *zip(*fd_pdep_args))
+
+                if synchronous:
+                    fd_results = map(correctors.generate_pdep_features, *zip(*fd_pdep_args))
+                else:
+                    chunksize = len(fd_pdep_args) // n_workers
+                    with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
+                        fd_results = executor.map(correctors.generate_pdep_features, *zip(*fd_pdep_args), chunksize=chunksize)
 
                 for r in fd_results:
                     d.inferred_corrections.get(r['corrector'])[r['cell']] = r['correction_dict']
@@ -758,11 +766,17 @@ class Cleaning:
                 for (row, col) in synthetic_error_cells:
                     df_probas = d.imputer_models.get(col)
                     if df_probas is not None:
-                        auto_instance_args.append([(row, col), df_probas, d.dataframe.iloc[row, col]])
+                        #auto_instance_args.append([(row, col), df_probas, d.dataframe.iloc[row, col]])
+                        auto_instance_args.append([(row, col), df_probas.iloc[row], d.dataframe.iloc[row, col]])
                 if len(auto_instance_args) == 0:
                     datawig_results = []
                 else:
-                    datawig_results = map(correctors.generate_datawig_features, *zip(*auto_instance_args))
+                    if synchronous:
+                        datawig_results = map(correctors.generate_datawig_features, *zip(*auto_instance_args))
+                    else:
+                        chunksize = len(fd_pdep_args) // n_workers
+                        with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
+                            datawig_results = executor.map(correctors.generate_datawig_features, *zip(*auto_instance_args), chunksize=chunksize)
 
                 for r in datawig_results:
                     d.inferred_corrections.get(r['corrector'])[r['cell']] = r['correction_dict']
@@ -896,9 +910,14 @@ class Cleaning:
             os.mkdir(ec_folder_path)
         pickle.dump(d, open(os.path.join(ec_folder_path, "correction.dataset"), "wb"))
 
-    def run(self, d, random_seed):
+    def run(self, d, random_seed: int, synchronous: bool):
         """
-        This method runs Mimir on an input dataset to correct data errors.
+        This method runs Mimir on an input dataset to correct data errors. A random_seed introduces
+        some determinism in the feature_sampling process, but generally the cleaning process is
+        non-deterministic despite a random_seed.
+        The `synchronous` parameter, if set to true, will execute Mimir synchronously. If set to false,
+        multiprocessing will be used to speed up the computation by shifting expensive operations
+        concurrently onto multiple cores.
         """
         d = self.initialize_dataset(d)
         if len(d.detected_cells) == 0:
@@ -910,8 +929,8 @@ class Cleaning:
 
         while len(d.labeled_tuples) <= self.LABELING_BUDGET:
             self.prepare_augmented_models(d)
-            self.generate_features(d, synchronous=True)
-            self.generate_inferred_features(d, synchronous=True)
+            self.generate_features(d, synchronous)
+            self.generate_inferred_features(d, synchronous)
             self.binary_predict_corrections(d)
             self.clean_with_user_input(d)
             self.sample_tuple(d, random_seed=random_seed)
@@ -930,7 +949,7 @@ if __name__ == "__main__":
     # store results for detailed analysis
     dataset_analysis = False
 
-    dataset_name = "flights"
+    dataset_name = "hospital"
     error_class = 'simple_mnar'
     error_fraction = 5
     version = 1
@@ -965,4 +984,4 @@ if __name__ == "__main__":
                      fd_feature, domain_model_threshold, dataset_analysis)
     app.VERBOSE = True
     seed = 0
-    correction_dictionary = app.run(data, seed)
+    correction_dictionary = app.run(data, seed, synchronous=True)
