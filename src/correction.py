@@ -509,7 +509,7 @@ class Cleaning:
                     for encoding, correction_suggestions in zip(['identity', 'unicode'], encodings_list):
                         d.corrections.get(f'value_{model_name}_{encoding}')[error_cell] = correction_suggestions
 
-    def prepare_augmented_models(self, d):
+    def prepare_augmented_models(self, d, synchronous=False):
         """
         Prepare Mimir's augmented models:
         1) Calculate gpdeps and append them to d.
@@ -544,7 +544,7 @@ class Cleaning:
             d.fd_counts_dict, lhs_values_frequencies = pdep.fast_fd_counts(d.dataframe, row_errors, d.fds)
             self.logger.debug('Mined FD counts.')
 
-            gpdeps = pdep.fd_calc_gpdeps(d.fd_counts_dict, lhs_values_frequencies, shape, row_errors, False)
+            gpdeps = pdep.fd_calc_gpdeps(d.fd_counts_dict, lhs_values_frequencies, shape, row_errors, synchronous)
             self.logger.debug('Calculated gpdeps.')
 
             d.fd_inverted_gpdeps = {}
@@ -687,7 +687,6 @@ class Cleaning:
             for (row, col) in d.detected_cells:
                 df_probas = d.imputer_models.get(col)
                 if df_probas is not None:
-                    #auto_instance_args.append([(row, col), df_probas, d.dataframe.iloc[row, col]])
                     auto_instance_args.append([(row, col), df_probas.iloc[row], d.dataframe.iloc[row, col]])
             if len(auto_instance_args) == 0:
                 datawig_results = []
@@ -766,7 +765,6 @@ class Cleaning:
                 for (row, col) in synthetic_error_cells:
                     df_probas = d.imputer_models.get(col)
                     if df_probas is not None:
-                        #auto_instance_args.append([(row, col), df_probas, d.dataframe.iloc[row, col]])
                         auto_instance_args.append([(row, col), df_probas.iloc[row], d.dataframe.iloc[row, col]])
                 if len(auto_instance_args) == 0:
                     datawig_results = []
@@ -928,7 +926,7 @@ class Cleaning:
         self.initialize_models(d)
 
         while len(d.labeled_tuples) <= self.LABELING_BUDGET:
-            self.prepare_augmented_models(d)
+            self.prepare_augmented_models(d, synchronous)
             self.generate_features(d, synchronous)
             self.generate_inferred_features(d, synchronous)
             self.binary_predict_corrections(d)
