@@ -982,4 +982,4 @@ if __name__ == "__main__":
                      fd_feature, domain_model_threshold, dataset_analysis)
     app.VERBOSE = True
     seed = 0
-    correction_dictionary = app.run(data, seed, synchronous=True)
+    correction_dictionary = app.run(data, seed, synchronous=False)
