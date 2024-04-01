@@ -6,6 +6,7 @@ import random
 import difflib
 import unicodedata
 import multiprocessing
+import concurrent.futures
 from itertools import combinations
 import logging
 
@@ -16,7 +17,7 @@ import sklearn.linear_model
 import sklearn.tree
 import sklearn.feature_selection
 
-from typing import Dict, List, Union, Tuple
+from typing import Dict, List, Tuple
 import pandas as pd
 
 import dataset
@@ -25,6 +26,10 @@ import pdep
 import hpo
 import helpers
 import ml_helpers
+import correctors
+
+# sample randomly to prevent sorted data messing up the sampling process.
+random.seed(0)
 
 root_logger = logging.getLogger()
 # Check if there are no handlers attached to the root logger
@@ -453,19 +458,12 @@ class Cleaning:
         if self.VERBOSE:
             self.logger.info("The user labeled an additional tuple: {}.".format(d.sampled_tuple))
 
-    def _feature_generator_process(self, args) -> List[Tuple[Tuple[int, int], str, Union[str, None]]]:
+    def _feature_generator_process(self, args):
         """
-        This method generates cleaning suggestions for one error in one cell. The suggestion
-        gets turned into features for the classifier in predict_corrections(). It gets called
-        once for each error cell.
-
-        Depending on the value of `synchronous` in `generate_features()`, the method will
-        be executed in parallel or not.
-
-        Returns a List of Tuples with the structure (error_cell, cleaning_model_name, prompt), where prompt is to be
-        sent to openai to clean cell error_cell using the approach called cleaning_model_name.
+        This method supports Baran correctors. It generates cleaning suggestions for one error
+        in one cell. The suggestion gets turned into features for the classifier in
+        predict_corrections(). It gets called once for each error cell.
         """
-        ai_prompts: List[Tuple[Tuple[int, int], str, Union[str, None]]] = []
         d, error_cell, is_synth = args
 
         # vicinity ist die Zeile, column ist die Zeilennummer, old_value ist der Fehler
@@ -473,13 +471,6 @@ class Cleaning:
                             "old_value": d.dataframe.iloc[error_cell],
                             "vicinity": list(d.dataframe.iloc[error_cell[0], :]),
                             "row": error_cell[0]}
-
-        if "fd" in self.FEATURE_GENERATORS:
-            fd_corrections = pdep.fd_based_corrector(d.fd_inverted_gpdeps, d.fd_counts_dict, error_dictionary, self.FD_FEATURE)
-            if is_synth:
-                d.inferred_corrections.get('fd')[error_cell] = fd_corrections
-            else:
-                d.corrections.get('fd')[error_cell] = fd_corrections
 
         if "vicinity" in self.FEATURE_GENERATORS:
             if self.VICINITY_FEATURE_GENERATOR == 'naive':
@@ -511,91 +502,14 @@ class Cleaning:
                 raise ValueError(f'Unknown VICINITY_FEATURE_GENERATOR '
                                  f'{self.VICINITY_FEATURE_GENERATOR}')
 
-        if 'llm_correction' in self.FEATURE_GENERATORS and not is_synth and len(d.labeled_tuples) == self.LABELING_BUDGET:
-            """
-            Use large language model to correct an error based on the error value.
-            """
-            if error_dictionary['old_value'] != '':  # If there is no value to be transformed, skip.
-                error_positions = helpers.ErrorPositions(d.detected_cells, d.dataframe.shape, d.labeled_cells)
-                column_errors_positions = error_positions.original_column_errors().get(error_dictionary['column'], [])
-                column_errors_rows = [row for (row, col) in column_errors_positions]
-
-                # Construct pairs of ('error', 'correction') by iterating over the user input.
-                error_correction_pairs: List[Tuple[str, str]] = []
-                for labeled_row in d.labeled_tuples:
-                    if labeled_row in column_errors_rows:
-                        cell = labeled_row, error_dictionary['column']
-                        error = d.dataframe.iloc[cell]
-                        correction = d.labeled_cells[cell][1]
-                        if error != '':
-                            if correction == '':  # encode missing value
-                                correction = '<MV>'
-                            error_correction_pairs.append((error, correction))
-
-                # Only do llm_correction cleaning if there is an example for cleaning that column.
-                if len(error_correction_pairs) > 0:
-                    prompt = "You are a data cleaning machine that detects patterns to return a correction. If you do "\
-                             "not find a correction, you return the token <NULL>. You always follow the example.\n---\n"
-                    n_pairs = min(10, len(error_correction_pairs))
-                    for (error, correction) in random.sample(error_correction_pairs, n_pairs):
-                        prompt = prompt + f"error:{error}" + '\n' + f"correction:{correction}" + '\n'
-                    prompt = prompt + f"error:{error_dictionary['old_value']}" + '\n' + "correction:"
-                    ai_prompts.append((error_cell, 'llm_correction', prompt))
-
-        if 'llm_master' in self.FEATURE_GENERATORS and len(d.labeled_tuples) == self.LABELING_BUDGET:
-            # use large language model to correct an error based on the error's vicinity. Inspired by Narayan et al.
-            # 2022.
-            if not is_synth:
-                error_positions = helpers.ErrorPositions(d.detected_cells, d.dataframe.shape, d.labeled_cells)
-                row_errors = error_positions.updated_row_errors()
-                rows_without_errors = [i for i in range(d.dataframe.shape[0]) if len(row_errors[i]) == 0]
-                if len(rows_without_errors) >= 3:
-                    prompt = "You are a data cleaning machine that returns a correction, which is a single expression. If "\
-                             "you do not find a correction, return the token <NULL>. You always follow the example.\n---\n"
-                    n_pairs = min(5, len(rows_without_errors))
-                    rows = random.sample(rows_without_errors, n_pairs)
-                    for row in rows:
-                        row_as_string, correction = helpers.error_free_row_to_prompt(d.dataframe, row, error_dictionary['column'])
-                        prompt = prompt + row_as_string + '\n' + f'correction:{correction}' + '\n'
-                    final_row_as_string, _ = helpers.error_free_row_to_prompt(d.dataframe, error_dictionary['row'], error_dictionary['column'])
-                    prompt = prompt + final_row_as_string + '\n' + 'correction:'
-                    ai_prompts.append((error_cell, 'llm_master', prompt))
-            else:  # synth - return empty prompts and use cache to make cleaning suggestions due to API cost.
-                # ai_prompts.append((error_cell, 'llm_master', ''))
-                pass
-
-        if "domain_instance" in self.FEATURE_GENERATORS:
-            if is_synth:
-                d.inferred_corrections.get('domain_instance')[error_cell] = self._domain_based_corrector(d.domain_models, error_dictionary)
-            else:
-                d.corrections.get('domain_instance')[error_cell] = self._domain_based_corrector(d.domain_models, error_dictionary)
-
         if "value" in self.FEATURE_GENERATORS:
             if not is_synth:
                 value_correction_suggestions = self._value_based_corrector(d.value_models, error_dictionary)
-                if error_cell == (0,4):
-                    a = 1
                 for model_name, encodings_list in value_correction_suggestions.items():
                     for encoding, correction_suggestions in zip(['identity', 'unicode'], encodings_list):
                         d.corrections.get(f'value_{model_name}_{encoding}')[error_cell] = correction_suggestions
 
-        if "auto_instance" in self.FEATURE_GENERATORS:
-            imputer_corrections = self._imputer_based_corrector(d.imputer_models, error_dictionary)
-
-            # Sometimes training an auto_instance model fails for a column, while it succeeds on other columns.
-            # If training failed for a column, imputer_corrections will be an empty list. Which will lead
-            # to one less feature being added to values in that column. Which in turn is bad news in the ensemble.
-            # To prevent this, I have imputer_corrections fall back to {}, which has length 1 and will create
-            # a feature.
-            if len(d.labeled_tuples) == self.LABELING_BUDGET and len(imputer_corrections) == 0:
-                imputer_corrections = {}
-            if is_synth:
-                d.inferred_corrections.get('auto_instance')[error_cell] = imputer_corrections
-            else:
-                d.corrections.get('auto_instance')[error_cell] = imputer_corrections
-        return ai_prompts
-
-    def prepare_augmented_models(self, d):
+    def prepare_augmented_models(self, d, synchronous=False):
         """
         Prepare Mimir's augmented models:
         1) Calculate gpdeps and append them to d.
@@ -626,10 +540,11 @@ class Cleaning:
             error_positions = helpers.ErrorPositions(d.detected_cells, shape, d.labeled_cells)
             row_errors = error_positions.updated_row_errors()
             self.logger.debug('Calculated error positions.')
-            #d.fd_counts_dict, lhs_values_frequencies = pdep.mine_fd_counts(d.dataframe, row_errors, d.fds)
+
             d.fd_counts_dict, lhs_values_frequencies = pdep.fast_fd_counts(d.dataframe, row_errors, d.fds)
             self.logger.debug('Mined FD counts.')
-            gpdeps = pdep.fd_calc_gpdeps(d.fd_counts_dict, lhs_values_frequencies, shape, row_errors)
+
+            gpdeps = pdep.fd_calc_gpdeps(d.fd_counts_dict, lhs_values_frequencies, shape, row_errors, synchronous)
             self.logger.debug('Calculated gpdeps.')
 
             d.fd_inverted_gpdeps = {}
@@ -678,30 +593,121 @@ class Cleaning:
         """
         Use correctors to generate correction features.
         """
-        ai_prompts: List[Tuple[Tuple[int, int], str, Union[str, None]]] = []
         process_args_list = [[d, cell, False] for cell in d.detected_cells]
+        n_workers = min(multiprocessing.cpu_count() - 1, 24)
 
-        # generate all features but the llm-features
-        if not synchronous:
-            self.logger.debug('Start asynchronous user feature generation.')
-            pool = multiprocessing.Pool()
-            prompt_lists = pool.map(self._feature_generator_process, process_args_list)
-            pool.close()
-            for l in prompt_lists:
-                ai_prompts.extend(l)
-            self.logger.debug('Finish asynchronous user feature generation.')
-        else:
-            self.logger.debug('Start synchronous user feature generation.')
-            for args in process_args_list:
-                ai_prompts.extend(self._feature_generator_process(args))
-            self.logger.debug('Finish synchronous user feature generation.')
+        self.logger.debug('Start user feature generation of Mimir Correctors.')
 
-        # generate llm-features
-        if len(d.labeled_tuples) == self.LABELING_BUDGET:
-            for error_cell, model_name, prompt in ai_prompts:
-                correction, token_logprobs, top_logprobs = helpers.fetch_cached_llm(d.name, error_cell, prompt, model_name, d.error_fraction, d.version, d.error_class)
-                correction_dicts = helpers.llm_response_to_corrections(correction, token_logprobs, top_logprobs)
-                d.corrections.get(model_name)[error_cell] = correction_dicts
+        if "fd" in self.FEATURE_GENERATORS:
+            fd_pdep_args = []
+            for row, col in d.detected_cells:
+                gpdeps = d.fd_inverted_gpdeps.get(col)
+                if gpdeps is not None:
+                    local_counts_dict = {lhs_cols: d.fd_counts_dict[lhs_cols] for lhs_cols in gpdeps}  # save memory by subsetting counts_dict
+                    row_values = list(d.dataframe.iloc[row, :])
+                    fd_pdep_args.append([(row, col), local_counts_dict, gpdeps, row_values, self.FD_FEATURE])
+            
+            if synchronous:
+                fd_results = map(correctors.generate_pdep_features, *zip(*fd_pdep_args))
+            else:
+                chunksize = len(fd_pdep_args) // min(len(fd_pdep_args), n_workers)  # makes it so that chunksize >= 0.
+                with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
+                    fd_results = executor.map(correctors.generate_pdep_features, *zip(*fd_pdep_args), chunksize=chunksize)
+
+            for r in fd_results:
+                d.corrections.get(r['corrector'])[r['cell']] = r['correction_dict']
+
+        self.logger.debug('Finished generating pdep-fd features.')
+        
+        if 'llm_correction' in self.FEATURE_GENERATORS and len(d.labeled_tuples) == self.LABELING_BUDGET:
+            error_correction_pairs: Dict[int, List[Tuple[str, str]]] = {}
+            llm_correction_args = []
+
+            # Construct pairs of ('error', 'correction') per column by iterating over the user input.
+            for cell in d.labeled_cells:
+                if cell in d.detected_cells:
+                    error = d.detected_cells[cell]
+                    correction = d.labeled_cells[cell][1]
+                    if error != '':
+                        if correction == '':  # encode missing value
+                            correction = '<MV>'
+                        if error_correction_pairs.get(cell[1]) is None:
+                            error_correction_pairs[cell[1]] = []
+                        error_correction_pairs[cell[1]].append((error, correction))
+
+            for (row, col) in d.detected_cells:
+                old_value = d.dataframe.iloc[(row, col)]
+                if old_value != '' and error_correction_pairs.get(col) is not None:  # Skip if there is no value to be transformed or no cleaning examples
+                    llm_correction_args.append([(row, col), old_value, error_correction_pairs[col], d.name, d.error_fraction, d.version, d.error_class])
+            
+            if synchronous:
+                llm_correction_results = map(correctors.generate_llm_correction_features, *zip(*llm_correction_args))
+            else:
+                chunksize = len(llm_correction_args) // min(len(llm_correction_args), n_workers)
+                with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
+                    llm_correction_results = executor.map(correctors.generate_llm_correction_features, *zip(*llm_correction_args), chunksize=chunksize)
+
+            for r in llm_correction_results:
+                d.corrections.get(r['corrector'])[r['cell']] = r['correction_dict']
+                    
+        self.logger.debug('Finished generating llm-correction features.')
+
+        if 'llm_master' in self.FEATURE_GENERATORS and len(d.labeled_tuples) == self.LABELING_BUDGET:
+            # use large language model to correct an error based on the error's vicinity. Inspired by Narayan et al.
+            # 2022.
+            llm_master_args = []
+
+            error_positions = helpers.ErrorPositions(d.detected_cells, d.dataframe.shape, d.labeled_cells)
+            row_errors = error_positions.updated_row_errors()
+            rows_without_errors = [i for i in range(d.dataframe.shape[0]) if len(row_errors[i]) == 0]
+
+            if len(rows_without_errors) < 3:
+                llm_master_results = []
+            else:
+                subset = random.sample(rows_without_errors, min(100, len(rows_without_errors)))
+                df_error_free_subset = d.dataframe.iloc[subset, :].copy()
+                for (row, col) in d.detected_cells:
+                    df_row_with_error = d.dataframe.iloc[row, :].copy()
+                    llm_master_args.append([(row, col), df_error_free_subset, df_row_with_error, d.name, d.error_fraction, d.version, d.error_class])
+                
+                if synchronous:
+                    llm_master_results = map(correctors.generate_llm_master_features, *zip(*llm_master_args))
+                else:
+                    chunksize = len(llm_master_args) // min(len(llm_master_args), n_workers)
+                    with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
+                        llm_master_results = executor.map(correctors.generate_llm_master_features, *zip(*llm_master_args), chunksize=chunksize)
+
+            for r in llm_master_results:
+                d.corrections.get(r['corrector'])[r['cell']] = r['correction_dict']
+
+        self.logger.debug('Finished generating llm-master features.')
+
+        if 'auto_instance' in self.FEATURE_GENERATORS and len(d.labeled_tuples) == self.LABELING_BUDGET:
+            auto_instance_args = []
+            for (row, col) in d.detected_cells:
+                df_probas = d.imputer_models.get(col)
+                if df_probas is not None:
+                    auto_instance_args.append([(row, col), df_probas.iloc[row], d.dataframe.iloc[row, col]])
+            if len(auto_instance_args) == 0:
+                datawig_results = []
+            else:
+                if synchronous:
+                    datawig_results = map(correctors.generate_datawig_features, *zip(*auto_instance_args))
+                else:
+                    chunksize = len(auto_instance_args) // min(len(auto_instance_args), n_workers)
+                    with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
+                        datawig_results = executor.map(correctors.generate_datawig_features, *zip(*auto_instance_args), chunksize=chunksize)
+
+            for r in datawig_results:
+                d.corrections.get(r['corrector'])[r['cell']] = r['correction_dict']
+
+        self.logger.debug('Finished generating DataWig features.')
+
+        # generate features Baran-style
+        self.logger.debug('Start user feature generation of Baran Correctors.')
+        for args in process_args_list:
+            self._feature_generator_process(args)
+        self.logger.debug('Finish user feature generation.')
 
         if self.VERBOSE:
             self.logger.info("User Features Generated.")
@@ -711,39 +717,75 @@ class Cleaning:
         Generate additional training data by using data from the dirty dataframe. This leverages the information about
         error positions, carefully avoiding additional training data that contains known errors.
         """
-
+        synth_args_list = []
         error_positions = helpers.ErrorPositions(d.detected_cells, d.dataframe.shape, d.labeled_cells)
         row_errors = error_positions.updated_row_errors()
 
         # determine error-free rows to sample from.
         candidate_rows = [(row, len(cells)) for row, cells in row_errors.items() if len(cells) == 0]
         ranked_candidate_rows = sorted(candidate_rows, key=lambda x: x[1])
+        n_workers = min(multiprocessing.cpu_count() - 1, 16)
 
         if self.SYNTH_TUPLES > 0 and len(ranked_candidate_rows) > 0:
-            # sample randomly to prevent sorted data messing up the sampling process.
-            random.seed(0)
-            if len(ranked_candidate_rows) <= self.SYNTH_TUPLES:
-                synthetic_error_rows = random.sample([x[0] for x in ranked_candidate_rows], len(ranked_candidate_rows))
-            else:
-                synthetic_error_rows = random.sample([x[0] for x in ranked_candidate_rows[:self.SYNTH_TUPLES]], self.SYNTH_TUPLES)
+            if len(ranked_candidate_rows) >= self.SYNTH_TUPLES:  # more candidate rows available than required, sample needed amount
+                synthetic_error_rows = random.sample([x[0] for x in ranked_candidate_rows], self.SYNTH_TUPLES)
+            else:  # less clean rows available than inferred tuples requested, take all you get.
+                logging.info(f'Requested {self.SYNTH_TUPLES} tuples to inferr features from, but only {len(ranked_candidate_rows)} error-free tuples are available.')
+                logging.info(f'Sampling {len(ranked_candidate_rows)} rows instead.')
+                synthetic_error_rows = [x[0] for x in ranked_candidate_rows]
             synthetic_error_cells = [(i, j) for i in synthetic_error_rows for j in range(d.dataframe.shape[1])]
 
             synth_args_list = [[d, cell, True] for cell in synthetic_error_cells]
-            ai_prompts: List[Tuple[Tuple[int, int], str, Union[str, None]]] = []
 
-            if not synchronous:
-                self.logger.debug('Start asynchronous inferred feature generation.')
-                pool = multiprocessing.Pool()
-                prompt_lists = pool.map(self._feature_generator_process, synth_args_list)
-                pool.close()
-                for l in prompt_lists:
-                    ai_prompts.extend(l)
-                self.logger.debug('Finish asynchronous inferred feature generation.')
-            else:
-                self.logger.debug('Start synchronous inferred feature generation.')
-                for args in synth_args_list:
-                    ai_prompts.extend(self._feature_generator_process(args))
-                self.logger.debug('Finish synchronous inferred feature generation.')
+            self.logger.debug('Start inferred feature generation of Mimir Correctors.')
+
+            if "fd" in self.FEATURE_GENERATORS:
+                fd_pdep_args = []
+                for row, col in synthetic_error_cells:
+                    gpdeps = d.fd_inverted_gpdeps.get(col)
+                    if gpdeps is not None:
+                        local_counts_dict = {lhs_cols: d.fd_counts_dict[lhs_cols] for lhs_cols in gpdeps}  # save memory by subsetting counts_dict
+                        row_values = list(d.dataframe.iloc[row, :])
+                        fd_pdep_args.append([(row, col), local_counts_dict, gpdeps, row_values, self.FD_FEATURE])
+
+                if synchronous:
+                    fd_results = map(correctors.generate_pdep_features, *zip(*fd_pdep_args))
+                else:
+                    chunksize = len(fd_pdep_args) // min(len(fd_pdep_args), n_workers)
+                    with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
+                        fd_results = executor.map(correctors.generate_pdep_features, *zip(*fd_pdep_args), chunksize=chunksize)
+
+                for r in fd_results:
+                    d.inferred_corrections.get(r['corrector'])[r['cell']] = r['correction_dict']
+
+            self.logger.debug('Finished generating inferred pdep-fd features.')
+
+            if 'auto_instance' in self.FEATURE_GENERATORS and len(d.labeled_tuples) == self.LABELING_BUDGET:
+                auto_instance_args = []
+                for (row, col) in synthetic_error_cells:
+                    df_probas = d.imputer_models.get(col)
+                    if df_probas is not None:
+                        auto_instance_args.append([(row, col), df_probas.iloc[row], d.dataframe.iloc[row, col]])
+                if len(auto_instance_args) == 0:
+                    datawig_results = []
+                else:
+                    if synchronous:
+                        datawig_results = map(correctors.generate_datawig_features, *zip(*auto_instance_args))
+                    else:
+                        chunksize = len(fd_pdep_args) // min(len(fd_pdep_args), n_workers)
+                        with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
+                            datawig_results = executor.map(correctors.generate_datawig_features, *zip(*auto_instance_args), chunksize=chunksize)
+
+                for r in datawig_results:
+                    d.inferred_corrections.get(r['corrector'])[r['cell']] = r['correction_dict']
+
+        self.logger.debug('Finished generating inferred DataWig features.')
+
+        if len(synth_args_list) > 0:
+            self.logger.debug('Start inferred feature generation of Baran Correctors.')
+            for args in synth_args_list:
+                self._feature_generator_process(args)
+        self.logger.debug('Finish inferred feature generation.')
 
             # Stub to get llm_master to work in unsupervised setup.
             #
@@ -759,10 +801,6 @@ class Cleaning:
             #         correction, token_logprobs, top_logprobs = cache
             #         correction_dicts = helpers.llm_response_to_corrections(correction, token_logprobs, top_logprobs)
             #         d.inferred_corrections.get(model_name)[error_cell] = correction_dicts
-
-            if self.VERBOSE:
-                self.logger.info("Inferred Features Generated.")
-
 
     def binary_predict_corrections(self, d):
         """
@@ -820,7 +858,7 @@ class Cleaning:
                 predicted_probas = [x[1] for x in gs_clf.predict_proba(x_test)]
 
             ml_helpers.set_binary_cleaning_suggestions(predicted_labels, predicted_probas, x_test, error_correction_suggestions, d.corrected_cells)
-            self.logger.debug('Finish inferring corrections.')
+        self.logger.debug('Finish inferring corrections.')
 
         if self.LABELING_BUDGET == len(d.labeled_tuples) and self.DATASET_ANALYSIS:
             samples = {c: random.sample(column_errors[c], min(40, len(column_errors[c]))) for c in column_errors}
@@ -870,9 +908,14 @@ class Cleaning:
             os.mkdir(ec_folder_path)
         pickle.dump(d, open(os.path.join(ec_folder_path, "correction.dataset"), "wb"))
 
-    def run(self, d, random_seed):
+    def run(self, d, random_seed: int, synchronous: bool):
         """
-        This method runs Mimir on an input dataset to correct data errors.
+        This method runs Mimir on an input dataset to correct data errors. A random_seed introduces
+        some determinism in the feature_sampling process, but generally the cleaning process is
+        non-deterministic despite a random_seed.
+        The `synchronous` parameter, if set to true, will execute Mimir synchronously. If set to false,
+        multiprocessing will be used to speed up the computation by shifting expensive operations
+        concurrently onto multiple cores.
         """
         d = self.initialize_dataset(d)
         if len(d.detected_cells) == 0:
@@ -883,9 +926,9 @@ class Cleaning:
         self.initialize_models(d)
 
         while len(d.labeled_tuples) <= self.LABELING_BUDGET:
-            self.prepare_augmented_models(d)
-            self.generate_features(d, synchronous=True)
-            self.generate_inferred_features(d, synchronous=True)
+            self.prepare_augmented_models(d, synchronous)
+            self.generate_features(d, synchronous)
+            self.generate_inferred_features(d, synchronous)
             self.binary_predict_corrections(d)
             self.clean_with_user_input(d)
             self.sample_tuple(d, random_seed=random_seed)
@@ -904,21 +947,21 @@ if __name__ == "__main__":
     # store results for detailed analysis
     dataset_analysis = False
 
-    dataset_name = "flights"
+    dataset_name = "cars"
     error_class = 'simple_mnar'
-    error_fraction = 5
+    error_fraction = 1
     version = 1
     n_rows = None
 
     labeling_budget = 20
-    synth_tuples = 100
+    synth_tuples = 10
     synth_cleaning_threshold = 0.9
     auto_instance_cache_model = True
     clean_with_user_input = True  # Careful: If set to False, d.corrected_cells will remain empty.
     gpdep_threshold = 0.3
     training_time_limit = 30
     feature_generators = ['auto_instance', 'fd', 'llm_correction', 'llm_master']
-    #feature_generators = ['auto_instance', 'fd']
+    #feature_generators = ['fd']
     classification_model = "ABC"
     fd_feature = 'norm_gpdep'
     vicinity_orders = [1]
@@ -939,4 +982,4 @@ if __name__ == "__main__":
                      fd_feature, domain_model_threshold, dataset_analysis)
     app.VERBOSE = True
     seed = 0
-    correction_dictionary = app.run(data, seed)
+    correction_dictionary = app.run(data, seed, synchronous=False)

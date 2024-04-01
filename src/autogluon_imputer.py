@@ -14,9 +14,6 @@ import numpy as np
 import pandas as pd
 
 
-random.seed(1)
-np.random.seed(42)
-
 def random_split(data_frame: pd.DataFrame,
                  split_ratios: List[float] = None,
                  seed: int = 10) -> List[pd.DataFrame]:

@@ -15,6 +15,12 @@ import dotenv
 dotenv.load_dotenv()
 openai.api_key = os.environ.get('OPENAI_API_KEY')
 
+@dataclass
+class LLMRequest:
+    cell: Tuple[int, int]
+    corrector_name: str
+    prompt: Union[str, None]
+
 
 @dataclass
 class ErrorPositions:
@@ -127,7 +133,7 @@ def connect_to_cache() -> sqlite3.Connection:
 
 def fetch_cached_llm(dataset: str,
                      error_cell: Tuple[int,int],
-                     prompt: str,
+                     prompt: Union[str, None],
                      correction_model_name: str,
                      error_fraction: Union[None, int] = None,
                      version: Union[None, int] = None,
@@ -175,7 +181,7 @@ def fetch_cache(dataset: str,
 
     conn = connect_to_cache()
     cursor = conn.cursor()
-    query = f"""SELECT
+    query = """SELECT
                  correction_tokens,
                  token_logprobs,
                  top_logprobs
@@ -188,7 +194,7 @@ def fetch_cache(dataset: str,
     parameters = [dataset_name, error_cell[0], error_cell[1], correction_model_name]
     # Add conditions for optional parameters
     if error_fraction is not None:
-        query += f" AND error_fraction=?"
+        query += " AND error_fraction=?"
         parameters.append(error_fraction)
     else:
         query += " AND error_fraction IS NULL"
@@ -200,7 +206,7 @@ def fetch_cache(dataset: str,
         query += " AND version IS NULL"
 
     if error_class is not None:
-        query += f" AND error_class=?"
+        query += " AND error_class=?"
         parameters.append(error_class)
     else:
         query += " AND error_class IS NULL"
@@ -213,7 +219,7 @@ def fetch_cache(dataset: str,
     return None
 
 
-def fetch_llm(prompt: str,
+def fetch_llm(prompt: Union[str, None],
               dataset: str,
               error_cell: Tuple[int, int],
               correction_model_name: str,
@@ -318,8 +324,12 @@ def error_free_row_to_prompt(df: pd.DataFrame, row: int, column: int) -> Tuple[s
     Return a tuple of (stringified_row, correction). Be mindful that correction is only the correct value if
     the row does not contain an error to begin with.
     """
-    values = df.iloc[row, :].values
+    if len(df.shape) == 1:  # final row, a series
+        correction = ''
+        values = df.values
+    else:  # dataframe
+        correction = df.iloc[row, column]
+        values = df.iloc[row, :].values
     row_values = [f"{x}," if i != column else "<Error>," for i, x in enumerate(values)]
     assembled_row_values = ''.join(row_values)[:-1]
-    correction = df.iloc[row, column]
     return assembled_row_values, correction
