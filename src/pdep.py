@@ -374,7 +374,7 @@ def fd_calc_gpdeps(
         results = map(gpdep, *zip(*arguments))
     else:
         n_workers = min(multiprocessing.cpu_count() - 1, 16)
-        chunksize = len(arguments) // n_workers
+        chunksize = len(arguments) // min(len(arguments), n_workers)
         with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
             results = executor.map(gpdep, *zip(*arguments), chunksize=chunksize)
 
