@@ -94,15 +94,26 @@ def load_dedicated_experiments(saved_config: str):
     with open(config_path, 'rt') as f:
         config = yaml.safe_load(f)
 
-    baran_configs = combine_configs(ranges=config['ranges_baran'],
-                                    config=config['config_baran'],
-                                    runs=config['runs'])
-    renuver_configs = combine_configs(ranges=config['ranges_renuver'],
-                                      config=config['config_renuver'],
-                                      runs=config['runs'])
-    openml_configs = combine_configs(ranges=config['ranges_openml'],
-                                     config=config['config_openml'],
-                                     runs=config['runs'])
+    if config.get('ranges_baran') is None:
+        baran_configs = []
+    else:
+        baran_configs = combine_configs(ranges=config['ranges_baran'],
+                                        config=config['config_baran'],
+                                        runs=config['runs'])
+    
+    if config.get('ranges_renuver') is None:
+        renuver_configs = []
+    else:
+        renuver_configs = combine_configs(ranges=config['ranges_renuver'],
+                                        config=config['config_renuver'],
+                                        runs=config['runs'])
+
+    if config.get('ranges_openml') is None:
+        openml_configs = []
+    else:
+        openml_configs = combine_configs(ranges=config['ranges_openml'],
+                                        config=config['config_openml'],
+                                        runs=config['runs'])
 
     print(f'Successfully loaded experiment configuration from {saved_config}.')
     configs = [*baran_configs, *renuver_configs, *openml_configs]
