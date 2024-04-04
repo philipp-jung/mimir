@@ -370,13 +370,16 @@ def fd_calc_gpdeps(
 
     gpdeps = {lhs: {} for lhs in lhss}
     arguments = [(error_corrected_row_count(n_rows, row_errors, lhs, rhs), counts_dict, lhs_values_frequencies, lhs, rhs) for lhs in counts_dict for rhs in counts_dict[lhs]]
+    results = []
+
     if synchronous:
         results = map(gpdep, *zip(*arguments))
     else:
-        n_workers = min(multiprocessing.cpu_count() - 1, 16)
-        chunksize = len(arguments) // min(len(arguments), n_workers)
-        with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
-            results = executor.map(gpdep, *zip(*arguments), chunksize=chunksize)
+        if len(arguments) > 0:
+            n_workers = min(multiprocessing.cpu_count() - 1, 16)
+            chunksize = len(arguments) // min(len(arguments), n_workers)
+            with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
+                results = executor.map(gpdep, *zip(*arguments), chunksize=chunksize)
 
     for r in results:
         lhs, rhs, gpdep_result = r

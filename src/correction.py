@@ -600,6 +600,7 @@ class Cleaning:
 
         if "fd" in self.FEATURE_GENERATORS:
             fd_pdep_args = []
+            fd_results = []
             for row, col in d.detected_cells:
                 gpdeps = d.fd_inverted_gpdeps.get(col)
                 if gpdeps is not None:
@@ -610,9 +611,10 @@ class Cleaning:
             if synchronous:
                 fd_results = map(correctors.generate_pdep_features, *zip(*fd_pdep_args))
             else:
-                chunksize = len(fd_pdep_args) // min(len(fd_pdep_args), n_workers)  # makes it so that chunksize >= 0.
-                with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
-                    fd_results = executor.map(correctors.generate_pdep_features, *zip(*fd_pdep_args), chunksize=chunksize)
+                if len(fd_pdep_args) > 0:
+                    chunksize = len(fd_pdep_args) // min(len(fd_pdep_args), n_workers)  # makes it so that chunksize >= 0.
+                    with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
+                        fd_results = executor.map(correctors.generate_pdep_features, *zip(*fd_pdep_args), chunksize=chunksize)
 
             for r in fd_results:
                 d.corrections.get(r['corrector'])[r['cell']] = r['correction_dict']
@@ -622,6 +624,7 @@ class Cleaning:
         if 'llm_correction' in self.FEATURE_GENERATORS and len(d.labeled_tuples) == self.LABELING_BUDGET:
             error_correction_pairs: Dict[int, List[Tuple[str, str]]] = {}
             llm_correction_args = []
+            llm_correction_results = []
 
             # Construct pairs of ('error', 'correction') per column by iterating over the user input.
             for cell in d.labeled_cells:
@@ -643,9 +646,10 @@ class Cleaning:
             if synchronous:
                 llm_correction_results = map(correctors.generate_llm_correction_features, *zip(*llm_correction_args))
             else:
-                chunksize = len(llm_correction_args) // min(len(llm_correction_args), n_workers)
-                with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
-                    llm_correction_results = executor.map(correctors.generate_llm_correction_features, *zip(*llm_correction_args), chunksize=chunksize)
+                if len(llm_correction_args) > 0:
+                    chunksize = len(llm_correction_args) // min(len(llm_correction_args), n_workers)
+                    with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
+                        llm_correction_results = executor.map(correctors.generate_llm_correction_features, *zip(*llm_correction_args), chunksize=chunksize)
 
             for r in llm_correction_results:
                 d.corrections.get(r['corrector'])[r['cell']] = r['correction_dict']
@@ -656,6 +660,7 @@ class Cleaning:
             # use large language model to correct an error based on the error's vicinity. Inspired by Narayan et al.
             # 2022.
             llm_master_args = []
+            llm_master_results = []
 
             error_positions = helpers.ErrorPositions(d.detected_cells, d.dataframe.shape, d.labeled_cells)
             row_errors = error_positions.updated_row_errors()
@@ -673,9 +678,10 @@ class Cleaning:
                 if synchronous:
                     llm_master_results = map(correctors.generate_llm_master_features, *zip(*llm_master_args))
                 else:
-                    chunksize = len(llm_master_args) // min(len(llm_master_args), n_workers)
-                    with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
-                        llm_master_results = executor.map(correctors.generate_llm_master_features, *zip(*llm_master_args), chunksize=chunksize)
+                    if len(llm_master_args) > 0:
+                        chunksize = len(llm_master_args) // min(len(llm_master_args), n_workers)
+                        with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
+                            llm_master_results = executor.map(correctors.generate_llm_master_features, *zip(*llm_master_args), chunksize=chunksize)
 
             for r in llm_master_results:
                 d.corrections.get(r['corrector'])[r['cell']] = r['correction_dict']
@@ -684,6 +690,7 @@ class Cleaning:
 
         if 'auto_instance' in self.FEATURE_GENERATORS and len(d.labeled_tuples) == self.LABELING_BUDGET:
             auto_instance_args = []
+            datawig_results = []
             for (row, col) in d.detected_cells:
                 df_probas = d.imputer_models.get(col)
                 if df_probas is not None:
@@ -694,9 +701,10 @@ class Cleaning:
                 if synchronous:
                     datawig_results = map(correctors.generate_datawig_features, *zip(*auto_instance_args))
                 else:
-                    chunksize = len(auto_instance_args) // min(len(auto_instance_args), n_workers)
-                    with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
-                        datawig_results = executor.map(correctors.generate_datawig_features, *zip(*auto_instance_args), chunksize=chunksize)
+                    if len(auto_instance_args) > 0:
+                        chunksize = len(auto_instance_args) // min(len(auto_instance_args), n_workers)
+                        with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
+                            datawig_results = executor.map(correctors.generate_datawig_features, *zip(*auto_instance_args), chunksize=chunksize)
 
             for r in datawig_results:
                 d.corrections.get(r['corrector'])[r['cell']] = r['correction_dict']
@@ -741,6 +749,7 @@ class Cleaning:
 
             if "fd" in self.FEATURE_GENERATORS:
                 fd_pdep_args = []
+                fd_results = []
                 for row, col in synthetic_error_cells:
                     gpdeps = d.fd_inverted_gpdeps.get(col)
                     if gpdeps is not None:
@@ -751,9 +760,10 @@ class Cleaning:
                 if synchronous:
                     fd_results = map(correctors.generate_pdep_features, *zip(*fd_pdep_args))
                 else:
-                    chunksize = len(fd_pdep_args) // min(len(fd_pdep_args), n_workers)
-                    with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
-                        fd_results = executor.map(correctors.generate_pdep_features, *zip(*fd_pdep_args), chunksize=chunksize)
+                    if len(fd_pdep_args) > 0:
+                        chunksize = len(fd_pdep_args) // min(len(fd_pdep_args), n_workers)
+                        with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
+                            fd_results = executor.map(correctors.generate_pdep_features, *zip(*fd_pdep_args), chunksize=chunksize)
 
                 for r in fd_results:
                     d.inferred_corrections.get(r['corrector'])[r['cell']] = r['correction_dict']
@@ -762,6 +772,7 @@ class Cleaning:
 
             if 'auto_instance' in self.FEATURE_GENERATORS and len(d.labeled_tuples) == self.LABELING_BUDGET:
                 auto_instance_args = []
+                datawig_results = []
                 for (row, col) in synthetic_error_cells:
                     df_probas = d.imputer_models.get(col)
                     if df_probas is not None:
@@ -772,9 +783,10 @@ class Cleaning:
                     if synchronous:
                         datawig_results = map(correctors.generate_datawig_features, *zip(*auto_instance_args))
                     else:
-                        chunksize = len(fd_pdep_args) // min(len(fd_pdep_args), n_workers)
-                        with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
-                            datawig_results = executor.map(correctors.generate_datawig_features, *zip(*auto_instance_args), chunksize=chunksize)
+                        if len(fd_pdep_args) > 0:
+                            chunksize = len(fd_pdep_args) // min(len(fd_pdep_args), n_workers)
+                            with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
+                                datawig_results = executor.map(correctors.generate_datawig_features, *zip(*auto_instance_args), chunksize=chunksize)
 
                 for r in datawig_results:
                     d.inferred_corrections.get(r['corrector'])[r['cell']] = r['correction_dict']
@@ -947,11 +959,11 @@ if __name__ == "__main__":
     # store results for detailed analysis
     dataset_analysis = False
 
-    dataset_name = "cars"
+    dataset_name = "151"
     error_class = 'simple_mnar'
-    error_fraction = 1
+    error_fraction = 5
     version = 1
-    n_rows = None
+    n_rows = 1000
 
     labeling_budget = 20
     synth_tuples = 10

@@ -52,8 +52,6 @@ def generate_pdep_features(cell: Tuple[int, int],
             if highest_conditional_probabilities.get(d["correction"]) is None:
                 highest_conditional_probabilities[d["correction"]] = d[feature]
 
-    if cell == (2,6):
-        a =1
     return {'cell': cell, 'corrector': 'fd', 'correction_dict': highest_conditional_probabilities}
 
 def generate_llm_correction_features(cell: Tuple[int, int],

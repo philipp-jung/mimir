@@ -333,3 +333,18 @@ def error_free_row_to_prompt(df: pd.DataFrame, row: int, column: int) -> Tuple[s
     row_values = [f"{x}," if i != column else "<Error>," for i, x in enumerate(values)]
     assembled_row_values = ''.join(row_values)[:-1]
     return assembled_row_values, correction
+
+
+def calc_chunksize(n_tasks, n_cores) -> Union[int, None]:
+    """
+    Multiprocessing requires the specification of how many tasks are passed to each worker at a time, called
+    chunksize. In Mimir, we can assume that each task element takes roughly the same amount of time to finish.
+    We call this a Dense Scenario, which makes it reasonable to pass a lot of tasks to the workers at a time,
+    because retrieving new tasks from the task queue is expensive relative to how long it takes to carry out one
+    task.
+    See https://stackoverflow.com/a/54032744 and https://stackoverflow.com/a/43817408 for more info.
+    
+    Returns an integer that is my best effort to find a good chunksize, or None if it is not beneficial to do
+    multiprocessing at all and the computation terminates faster without it.
+    """
+    pass
