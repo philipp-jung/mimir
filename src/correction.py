@@ -608,10 +608,10 @@ class Cleaning:
                     row_values = list(d.dataframe.iloc[row, :])
                     fd_pdep_args.append([(row, col), local_counts_dict, gpdeps, row_values, self.FD_FEATURE])
             
-            if synchronous:
-                fd_results = map(correctors.generate_pdep_features, *zip(*fd_pdep_args))
-            else:
-                if len(fd_pdep_args) > 0:
+            if len(fd_pdep_args) > 0:
+                if synchronous:
+                    fd_results = map(correctors.generate_pdep_features, *zip(*fd_pdep_args))
+                else:
                     chunksize = len(fd_pdep_args) // min(len(fd_pdep_args), n_workers)  # makes it so that chunksize >= 0.
                     with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
                         fd_results = executor.map(correctors.generate_pdep_features, *zip(*fd_pdep_args), chunksize=chunksize)
@@ -643,10 +643,10 @@ class Cleaning:
                 if old_value != '' and error_correction_pairs.get(col) is not None:  # Skip if there is no value to be transformed or no cleaning examples
                     llm_correction_args.append([(row, col), old_value, error_correction_pairs[col], d.name, d.error_fraction, d.version, d.error_class])
             
-            if synchronous:
-                llm_correction_results = map(correctors.generate_llm_correction_features, *zip(*llm_correction_args))
-            else:
-                if len(llm_correction_args) > 0:
+            if len(llm_correction_args) > 0:
+                if synchronous:
+                    llm_correction_results = map(correctors.generate_llm_correction_features, *zip(*llm_correction_args))
+                else:
                     chunksize = len(llm_correction_args) // min(len(llm_correction_args), n_workers)
                     with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
                         llm_correction_results = executor.map(correctors.generate_llm_correction_features, *zip(*llm_correction_args), chunksize=chunksize)
@@ -675,10 +675,10 @@ class Cleaning:
                     df_row_with_error = d.dataframe.iloc[row, :].copy()
                     llm_master_args.append([(row, col), df_error_free_subset, df_row_with_error, d.name, d.error_fraction, d.version, d.error_class])
                 
-                if synchronous:
-                    llm_master_results = map(correctors.generate_llm_master_features, *zip(*llm_master_args))
-                else:
-                    if len(llm_master_args) > 0:
+                if len(llm_master_args) > 0:
+                    if synchronous:
+                        llm_master_results = map(correctors.generate_llm_master_features, *zip(*llm_master_args))
+                    else:
                         chunksize = len(llm_master_args) // min(len(llm_master_args), n_workers)
                         with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
                             llm_master_results = executor.map(correctors.generate_llm_master_features, *zip(*llm_master_args), chunksize=chunksize)
@@ -695,16 +695,13 @@ class Cleaning:
                 df_probas = d.imputer_models.get(col)
                 if df_probas is not None:
                     auto_instance_args.append([(row, col), df_probas.iloc[row], d.dataframe.iloc[row, col]])
-            if len(auto_instance_args) == 0:
-                datawig_results = []
-            else:
+            if len(auto_instance_args) > 0:
                 if synchronous:
                     datawig_results = map(correctors.generate_datawig_features, *zip(*auto_instance_args))
                 else:
-                    if len(auto_instance_args) > 0:
-                        chunksize = len(auto_instance_args) // min(len(auto_instance_args), n_workers)
-                        with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
-                            datawig_results = executor.map(correctors.generate_datawig_features, *zip(*auto_instance_args), chunksize=chunksize)
+                    chunksize = len(auto_instance_args) // min(len(auto_instance_args), n_workers)
+                    with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
+                        datawig_results = executor.map(correctors.generate_datawig_features, *zip(*auto_instance_args), chunksize=chunksize)
 
             for r in datawig_results:
                 d.corrections.get(r['corrector'])[r['cell']] = r['correction_dict']
@@ -757,10 +754,10 @@ class Cleaning:
                         row_values = list(d.dataframe.iloc[row, :])
                         fd_pdep_args.append([(row, col), local_counts_dict, gpdeps, row_values, self.FD_FEATURE])
 
-                if synchronous:
-                    fd_results = map(correctors.generate_pdep_features, *zip(*fd_pdep_args))
-                else:
-                    if len(fd_pdep_args) > 0:
+                if len(fd_pdep_args) > 0:
+                    if synchronous:
+                        fd_results = map(correctors.generate_pdep_features, *zip(*fd_pdep_args))
+                    else:
                         chunksize = len(fd_pdep_args) // min(len(fd_pdep_args), n_workers)
                         with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
                             fd_results = executor.map(correctors.generate_pdep_features, *zip(*fd_pdep_args), chunksize=chunksize)
@@ -777,16 +774,13 @@ class Cleaning:
                     df_probas = d.imputer_models.get(col)
                     if df_probas is not None:
                         auto_instance_args.append([(row, col), df_probas.iloc[row], d.dataframe.iloc[row, col]])
-                if len(auto_instance_args) == 0:
-                    datawig_results = []
-                else:
+                if len(auto_instance_args) > 0:
                     if synchronous:
                         datawig_results = map(correctors.generate_datawig_features, *zip(*auto_instance_args))
                     else:
-                        if len(fd_pdep_args) > 0:
-                            chunksize = len(fd_pdep_args) // min(len(fd_pdep_args), n_workers)
-                            with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
-                                datawig_results = executor.map(correctors.generate_datawig_features, *zip(*auto_instance_args), chunksize=chunksize)
+                        chunksize = len(auto_instance_args) // min(len(auto_instance_args), n_workers)
+                        with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
+                            datawig_results = executor.map(correctors.generate_datawig_features, *zip(*auto_instance_args), chunksize=chunksize)
 
                 for r in datawig_results:
                     d.inferred_corrections.get(r['corrector'])[r['cell']] = r['correction_dict']
