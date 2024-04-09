@@ -6,6 +6,8 @@ ranges_baran:
     - flights
     - hospital
     - rayyan
+    - tax
+    - food
 
 config_baran:
   dataset: "1481"
@@ -84,8 +86,8 @@ ranges_openml:
     - "41027"
     - "43572"
   error_fraction:
-    - 1
-    - 5
+    - 30
+    - 50
   error_class:
     - "simple_mcar"
     - "imputer_simple_mcar"
