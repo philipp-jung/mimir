@@ -272,25 +272,26 @@ class Cleaning:
         """
         This method initializes the error corrector models.
         """
-        d.domain_models = {}
+        if "domain" in self.FEATURE_GENERATORS:
+            d.domain_models = {}
 
-        for row in d.dataframe.itertuples():
-            i, row = row[0], row[1:]
-            # Das ist richtig cool: Jeder Wert des Tupels wird untersucht und
-            # es wird überprüft, ob dieser Wert ein aus Error Detection bekannter
-            # Fehler ist. Wenn dem so ist, wird der Wert durch das IGNORE_SIGN
-            # ersetzt.
-            vicinity_list = [cv if (i, cj) not in d.detected_cells else self.IGNORE_SIGN for cj, cv in enumerate(row)]
-            for j, value in enumerate(row):
-                # if rhs_value's position is not a known error
-                if (i, j) not in d.detected_cells:
-                    temp_vicinity_list = list(vicinity_list)
-                    temp_vicinity_list[j] = self.IGNORE_SIGN
-                    update_dictionary = {
-                        "column": j,
-                        "new_value": value,
-                    }
-                    self._domain_based_model_updater(d.domain_models, update_dictionary)
+            for row in d.dataframe.itertuples():
+                i, row = row[0], row[1:]
+                # Das ist richtig cool: Jeder Wert des Tupels wird untersucht und
+                # es wird überprüft, ob dieser Wert ein aus Error Detection bekannter
+                # Fehler ist. Wenn dem so ist, wird der Wert durch das IGNORE_SIGN
+                # ersetzt.
+                vicinity_list = [cv if (i, cj) not in d.detected_cells else self.IGNORE_SIGN for cj, cv in enumerate(row)]
+                for j, value in enumerate(row):
+                    # if rhs_value's position is not a known error
+                    if (i, j) not in d.detected_cells:
+                        temp_vicinity_list = list(vicinity_list)
+                        temp_vicinity_list[j] = self.IGNORE_SIGN
+                        update_dictionary = {
+                            "column": j,
+                            "new_value": value,
+                        }
+                        self._domain_based_model_updater(d.domain_models, update_dictionary)
 
         # Initialize LLM cache
         conn = helpers.connect_to_cache()
@@ -864,6 +865,7 @@ class Cleaning:
                 predicted_probas = [x[1] for x in gs_clf.predict_proba(x_test)]
 
             ml_helpers.set_binary_cleaning_suggestions(predicted_labels, predicted_probas, x_test, error_correction_suggestions, d.corrected_cells)
+
         self.logger.debug('Finish inferring corrections.')
 
         if self.LABELING_BUDGET == len(d.labeled_tuples) and self.DATASET_ANALYSIS:
@@ -951,10 +953,10 @@ class Cleaning:
 
 if __name__ == "__main__":
     # store results for detailed analysis
-    dataset_analysis = False
+    dataset_analysis = True
 
-    dataset_name = "151"
-    error_class = 'simple_mnar'
+    dataset_name = "tax"
+    error_class = 'simple_mcar'
     error_fraction = 5
     version = 1
     n_rows = 1000
@@ -967,7 +969,7 @@ if __name__ == "__main__":
     gpdep_threshold = 0.3
     training_time_limit = 30
     feature_generators = ['auto_instance', 'fd', 'llm_correction', 'llm_master']
-    #feature_generators = ['fd']
+    #feature_generators = ['auto_instance']
     classification_model = "ABC"
     fd_feature = 'norm_gpdep'
     vicinity_orders = [1]
@@ -988,4 +990,4 @@ if __name__ == "__main__":
                      fd_feature, domain_model_threshold, dataset_analysis)
     app.VERBOSE = True
     seed = 0
-    correction_dictionary = app.run(data, seed, synchronous=False)
+    correction_dictionary = app.run(data, seed, synchronous=True)

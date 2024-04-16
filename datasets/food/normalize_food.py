@@ -67,10 +67,10 @@ def main():
                      'inspectiontype': 'category',
                      'dbaname': 'str',
                      'zip': 'category'})
-    df_clean.to_csv('clean.csv')
-    df_clean.to_parquet('clean.parquet')
-    df_dirty.to_csv('dirty.csv')
-    df_dirty.to_parquet('dirty.parquet')
+    df_clean.to_csv('clean.csv', index=False)
+    df_clean.to_parquet('clean.parquet', index=False)
+    df_dirty.to_csv('dirty.csv', index=False)
+    df_dirty.to_parquet('dirty.parquet', index=False)
 
 if __name__ == '__main__':
     main()

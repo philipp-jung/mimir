@@ -10,7 +10,7 @@ def export_table(name: str, path: str, n_rows=None):
 
 
 def main():
-    baran_dataset_ids = ["beers", "flights", "hospital", "rayyan", "toy",]
+    baran_dataset_ids = ["beers", "flights", "hospital", "rayyan", "toy", "food", "tax"]
     renuver_dataset_ids = ["bridges", "cars", "glass", "restaurant"]
     openml_dataset_ids = ["6", "137", "151", "184", "1481", "41027", "43572"]
 

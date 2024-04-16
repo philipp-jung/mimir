@@ -90,7 +90,7 @@ def export_datasets(export_path: str):
     as .csv files.
     """
     e = ExportDataset(export_path)
-    baran_dataset_ids = ["beers", "flights", "hospital", "rayyan"]
+    baran_dataset_ids = ["beers", "flights", "hospital", "rayyan", "tax", "food"]
     renuver_dataset_ids = ["bridges", "cars", "glass", "restaurant"]
     openml_dataset_ids = ["6", "137", "151", "184", "1481", "43572"]
 

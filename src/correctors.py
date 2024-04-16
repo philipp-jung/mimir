@@ -100,17 +100,7 @@ def generate_llm_master_features(cell: Tuple[int, int],
 
 
 def generate_datawig_features(cell: Tuple[int, int], se_probas: pd.Series, error_value):
-    prob_d = {key: se_probas.to_dict()[key] for key in se_probas.to_dict()}
+    se_subset = se_probas[se_probas >= 0.001]  # cut off corrections with .1% > pr and drop corrections with pr == np.nan
+    se_subset = se_subset[se_subset.index != error_value]  # don't suggest the error as a correction
 
-    # sometimes autogluon returns np.nan, which the ensemble classifier downstream chokes up on.
-    result = {correction: 0.0 if np.isnan(pr) else pr for correction, pr in prob_d.items() if correction != error_value}
-
-    # Sometimes training an auto_instance model fails for a column, while it succeeds on other columns.
-    # If training failed for a column, imputer_corrections will be an empty list. Which will lead
-    # to one less feature being added to values in that column. Which in turn is bad news in the ensemble.
-    # To prevent this, I have imputer_corrections fall back to {}, which has length 1 and will create
-    # a feature.
-    if len(result) == 0:
-       result = {}
-
-    return {'cell': cell, 'corrector': 'auto_instance', 'correction_dict': result}
+    return {'cell': cell, 'corrector': 'auto_instance', 'correction_dict': se_subset.to_dict()}
