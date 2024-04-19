@@ -2,7 +2,6 @@
 AutoGluon Imputer
 Imputes missing values in tables based on autogluon-tabular. A convenience wrapper around AutoGluon.
 """
-import random
 import pickle
 import inspect
 from autogluon.tabular import TabularPredictor
@@ -22,7 +21,6 @@ def random_split(data_frame: pd.DataFrame,
 
     :param data_frame: a pandas DataFrame
     :param split_ratios: percentages of splits
-    :param seed: seed of random number generator
     :return:
     """
     if split_ratios is None:
@@ -104,7 +102,7 @@ class AutoGluonImputer():
             time_limit=time_limit,
             calibrate=True,
             verbosity=self.verbosity,
-            num_cpus=25)  # funny: num_cpus expects a string, and if you pass a string AG crashes.
+            num_cpus=25)  # funny: num_cpus expects a string, and if you pass a string, AG crashes.
 
         return self
 

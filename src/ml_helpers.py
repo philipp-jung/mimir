@@ -62,6 +62,8 @@ def set_binary_cleaning_suggestions(predicted_labels: List[int],
             # take the suggestions that have probabilities that are equal to the highest probability
             max_prob = max(suggestions[error_cell], key=lambda x: x['probability'])['probability']
             max_prob_suggestions = [suggestion for suggestion in suggestions[error_cell] if suggestion['probability'] == max_prob]
+            if error_cell == (152,11):
+                a = 1
             # take the suggestion with the highest
             if len(max_prob_suggestions) == 1:
                 corrected_cells[error_cell] = max_prob_suggestions[0]['correction']

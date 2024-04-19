@@ -572,11 +572,19 @@ class Cleaning:
 
         if 'auto_instance' in self.FEATURE_GENERATORS and len(d.labeled_tuples) == self.LABELING_BUDGET:
             self.logger.debug('Start training DataWig Models.')
-            # simulate user input by reading labeled data from the typed dataframe
+
+            # Simulate user input by reading labeled data from the typed dataframe
             inputted_rows = list(d.labeled_tuples.keys())
             typed_user_input = d.typed_clean_dataframe.iloc[inputted_rows, :]
             df_clean_subset = auto_instance.get_clean_table(d.typed_dataframe, d.detected_cells, typed_user_input)
-            for i_col, col in enumerate(df_clean_subset.columns):
+
+            # Model training is very expensive. Train models only for columns that contain errors.
+            error_positions = helpers.ErrorPositions(d.detected_cells, d.dataframe.shape, d.labeled_cells)
+            column_errors = error_positions.original_column_errors()
+            columns_with_errors = [c for c in column_errors if len(column_errors[c]) > 0]
+
+            columns = [(i_col, col) for i_col, col in enumerate(df_clean_subset.columns) if i_col in columns_with_errors]
+            for i_col, col in columns:
                 imp = auto_instance.train_cleaning_model(df_clean_subset,
                                                    d.name,
                                                    label=i_col,
@@ -955,21 +963,21 @@ if __name__ == "__main__":
     # store results for detailed analysis
     dataset_analysis = True
 
-    dataset_name = "tax"
+    dataset_name = "food"
     error_class = 'simple_mcar'
     error_fraction = 5
     version = 1
-    n_rows = 1000
+    n_rows = 20000
 
     labeling_budget = 20
     synth_tuples = 10
     synth_cleaning_threshold = 0.9
-    auto_instance_cache_model = True
+    auto_instance_cache_model = False
     clean_with_user_input = True  # Careful: If set to False, d.corrected_cells will remain empty.
     gpdep_threshold = 0.3
-    training_time_limit = 30
-    feature_generators = ['auto_instance', 'fd', 'llm_correction', 'llm_master']
-    #feature_generators = ['auto_instance']
+    training_time_limit = 90
+    #feature_generators = ['auto_instance', 'fd', 'llm_correction', 'llm_master']
+    feature_generators = ['auto_instance']
     classification_model = "ABC"
     fd_feature = 'norm_gpdep'
     vicinity_orders = [1]
@@ -982,6 +990,7 @@ if __name__ == "__main__":
     # Set this parameter to keep runtimes low when debugging
     data = dataset.Dataset(dataset_name, error_fraction, version, error_class, n_rows)
     data.detected_cells = data.get_errors_dictionary()
+
     logging.info(f'Initialized dataset {dataset_name}')
 
     app = Cleaning(labeling_budget, classification_model, clean_with_user_input, feature_generators, vicinity_orders,

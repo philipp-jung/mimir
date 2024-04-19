@@ -157,12 +157,16 @@ class Dataset:
         """
         if df_1.shape != df_2.shape:
             raise ValueError("Two compared datasets do not have equal sizes.")
-        difference_dictionary = {}
-        for row in range(df_1.shape[0]):
-            for col in range(df_1.shape[1]):
-                if df_1.iloc[row, col] != df_2.iloc[row, col]:
-                    difference_dictionary[(row, col)] = df_1.iloc[row, col]
-        return difference_dictionary
+
+        diff_mask = df_1 != df_2
+
+        differences = {}
+        for row_idx, row in enumerate(diff_mask.index):
+            for col_idx, column in enumerate(diff_mask.columns):
+                if diff_mask.at[row, column]:
+                    differences[(row_idx, col_idx)] = df_1.at[row, column]
+
+        return differences
 
     def create_repaired_dataset(self, correction_dictionary):
         """
