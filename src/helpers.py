@@ -137,7 +137,8 @@ def fetch_cached_llm(dataset: str,
                      correction_model_name: str,
                      error_fraction: Union[None, int] = None,
                      version: Union[None, int] = None,
-                     error_class: Union[None, str] = None) -> Tuple[dict, dict, dict]:
+                     error_class: Union[None, str] = None,
+                     llm_name: str = "gpt-3.5-turbo") -> Tuple[dict, dict, dict]:
     """
     Sending requests to LLMs is expensive (time & money). We use caching to mitigate that cost. As primary key for
     a correction serves (dataset_name, error_cell, version, correction_model_name). This is imperfect, but a reasonable
@@ -153,13 +154,14 @@ def fetch_cached_llm(dataset: str,
     @param error_fraction: Fraction of errors in the dataset.
     @param version: Version of the dataset. See dataset.py for details.
     @param error_class: Class of the error, e.g. MCAR
+    @param llm_name: Name of the LLM used to correct with.
     @return: correction_tokens, token_logprobs, and top_logprobs.
     """
-    cache = fetch_cache(dataset, error_cell, correction_model_name, error_fraction, version, error_class)
+    cache = fetch_cache(dataset, error_cell, correction_model_name, error_fraction, version, error_class, llm_name)
     if cache is not None:
         return cache[0], cache[1], cache[2]
     else:
-        return fetch_llm(prompt, dataset, error_cell, correction_model_name, error_fraction, version, error_class)
+        return fetch_llm(prompt, dataset, error_cell, correction_model_name, error_fraction, version, error_class, llm_name)
 
 
 def fetch_cache(dataset: str,
@@ -167,7 +169,8 @@ def fetch_cache(dataset: str,
                 correction_model_name: str,
                 error_fraction: Union[None, int] = None,
                 version: Union[None, int] = None,
-                error_class: Union[None, str] = None) -> Union[None, Tuple[dict, dict, dict]]:
+                error_class: Union[None, str] = None,
+                llm_name: str = "gpt-3.5-turbo") -> Union[None, Tuple[dict, dict, dict]]:
     """
     @param dataset: name of the dataset that is cleaned.
     @param error_cell: (row, column) position of the error.
@@ -190,8 +193,9 @@ def fetch_cache(dataset: str,
                  dataset=?
                  AND row=?
                  AND column=?
-                 AND correction_model=?"""
-    parameters = [dataset_name, error_cell[0], error_cell[1], correction_model_name]
+                 AND correction_model=?
+                 AND llm_name=?"""
+    parameters = [dataset_name, error_cell[0], error_cell[1], correction_model_name, llm_name]
     # Add conditions for optional parameters
     if error_fraction is not None:
         query += " AND error_fraction=?"
@@ -225,7 +229,8 @@ def fetch_llm(prompt: Union[str, None],
               correction_model_name: str,
               error_fraction: Union[None, int] = None,
               version: Union[None, int] = None,
-              error_class: Union[None, str] = None
+              error_class: Union[None, str] = None,
+              llm_name: str = "gpt-3.5-turbo"
               ) -> Tuple[dict, dict, dict]:
     """
     Send request to openai to get a prompt resolved. Write result into cache.
@@ -237,7 +242,7 @@ def fetch_llm(prompt: Union[str, None],
     while True:
         try:
             response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
+                model=llm_name,
                 messages=[{
                     'role': 'user',
                     'content': prompt,
@@ -270,9 +275,9 @@ def fetch_llm(prompt: Union[str, None],
     cursor = conn.cursor()
     cursor.execute(
         """INSERT INTO cache
-               (dataset, row, column, correction_model, correction_tokens, token_logprobs, top_logprobs, error_fraction, version, error_class)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (dataset, row, column, correction_model_name, json.dumps(correction_tokens), json.dumps(token_logprobs), json.dumps(top_logprobs), error_fraction, version, error_class)
+               (dataset, row, column, correction_model, correction_tokens, token_logprobs, top_logprobs, error_fraction, version, error_class, llm_name)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (dataset, row, column, correction_model_name, json.dumps(correction_tokens), json.dumps(token_logprobs), json.dumps(top_logprobs), error_fraction, version, error_class, llm_name)
     )
     conn.commit()
     conn.close()

@@ -60,7 +60,8 @@ def generate_llm_correction_features(cell: Tuple[int, int],
                                      dataset_name: str,
                                      error_fraction,
                                      version,
-                                     error_class):
+                                     error_class,
+                                     llm_name: str):
     prompt = "You are a data cleaning machine that detects patterns to return a correction. If you do "\
                 "not find a correction, you return the token <NULL>. You always follow the example.\n---\n"
 
@@ -70,7 +71,7 @@ def generate_llm_correction_features(cell: Tuple[int, int],
         prompt = prompt + f"error:{error}" + '\n' + f"correction:{correction}" + '\n'
     prompt = prompt + f"error:{old_value}" + '\n' + "correction:"
 
-    correction, token_logprobs, top_logprobs = helpers.fetch_cached_llm(dataset_name, cell, prompt, 'llm_correction', error_fraction, version, error_class)
+    correction, token_logprobs, top_logprobs = helpers.fetch_cached_llm(dataset_name, cell, prompt, 'llm_correction', error_fraction, version, error_class, llm_name)
     correction_dict = helpers.llm_response_to_corrections(correction, token_logprobs, top_logprobs)
 
     return {'cell': cell, 'corrector': 'llm_correction', 'correction_dict': correction_dict}
@@ -82,7 +83,8 @@ def generate_llm_master_features(cell: Tuple[int, int],
                                  dataset_name: str,
                                  error_fraction,
                                  version,
-                                 error_class):
+                                 error_class,
+                                 llm_name: str):
     prompt = "You are a data cleaning machine that returns a correction, which is a single expression. If "\
                 "you do not find a correction, return the token <NULL>. You always follow the example.\n---\n"
     n_pairs = min(5, len(df_error_free_subset))
@@ -93,7 +95,7 @@ def generate_llm_master_features(cell: Tuple[int, int],
     final_row_as_string, _ = helpers.error_free_row_to_prompt(df_row_with_error, 0, cell[1])
     prompt = prompt + final_row_as_string + '\n' + 'correction:'
 
-    correction, token_logprobs, top_logprobs = helpers.fetch_cached_llm(dataset_name, cell, prompt, 'llm_master', error_fraction, version, error_class)
+    correction, token_logprobs, top_logprobs = helpers.fetch_cached_llm(dataset_name, cell, prompt, 'llm_master', error_fraction, version, error_class, llm_name)
     correction_dict = helpers.llm_response_to_corrections(correction, token_logprobs, top_logprobs)
 
     return {'cell': cell, 'corrector': 'llm_master', 'correction_dict': correction_dict}
