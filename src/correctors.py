@@ -63,7 +63,8 @@ def generate_llm_correction_features(cell: Tuple[int, int],
                                      error_class,
                                      llm_name: str):
     prompt = "You are a data cleaning machine that detects patterns to return a correction. If you do "\
-                "not find a correction, you return the token <NULL>. You always follow the example.\n---\n"
+                "not find a correction, you return the token <NULL>. You always follow the example and "\
+                "return NOTHING but the correction or <NULL>.\n---\n"
 
     n_pairs = min(10, len(error_correction_pairs))
 

@@ -498,7 +498,7 @@ class Cleaning:
         Draw the positions of synthetic missing values used to gain additional training data.
         """
         error_positions = helpers.ErrorPositions(d.detected_cells, d.dataframe.shape, d.labeled_cells)
-        row_errors = error_positions.updated_row_errors()
+        row_errors = error_positions.original_row_errors()
 
         # determine error-free rows to sample from.
         candidate_rows = [(row, len(cells)) for row, cells in row_errors.items() if len(cells) == 0]
@@ -820,9 +820,6 @@ class Cleaning:
         pair_features = d.corrections.assemble_pair_features()
         synth_pair_features = d.inferred_corrections.assemble_pair_features()
 
-        if self.LABELING_BUDGET == len(d.labeled_tuples):
-            a = 1
-
         for j in columns_with_errors:
             if d.corrections.et_valid_corrections_made(d.corrected_cells, j) > 0:  # ET model mentioned ground truth once in suggestions
                 score = 0  # drop inferred_features to not distort correction classifier.
@@ -959,11 +956,11 @@ if __name__ == "__main__":
     # store results for detailed analysis
     dataset_analysis = True
 
-    dataset_name = "rayyan"
+    dataset_name = "tax"
     error_class = "simple_mcar"
     error_fraction = 5
     version = 1
-    n_rows = None
+    n_rows = 1000
 
     labeling_budget = 20
     synth_tuples = 100
@@ -972,8 +969,8 @@ if __name__ == "__main__":
     clean_with_user_input = True  # Careful: If set to False, d.corrected_cells will remain empty.
     gpdep_threshold = 0.3
     training_time_limit = 30
-    #feature_generators = ['auto_instance', 'fd', 'llm_correction', 'llm_master']
-    feature_generators = ['llm_correction']
+    feature_generators = ['auto_instance', 'fd', 'llm_correction', 'llm_master']
+    #feature_generators = ['llm_correction']
     classification_model = "ABC"
     fd_feature = 'norm_gpdep'
     vicinity_orders = [1]
@@ -982,7 +979,7 @@ if __name__ == "__main__":
     pdep_features = ['pr']
     test_synth_data_direction = 'user_data'
     domain_model_threshold = 0.01
-    llm_name_corrfm = "gpt-3.5-turbo"
+    llm_name_corrfm = "gpt-4-turbo"
 
     # Set this parameter to keep runtimes low when debugging
     data = dataset.Dataset(dataset_name, error_fraction, version, error_class, n_rows)
