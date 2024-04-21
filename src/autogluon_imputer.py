@@ -72,24 +72,20 @@ class AutoGluonImputer():
         return self.output_path / Path(f'agModels/{self.model_name}')
 
     def fit(self,
-            train_df: pd.DataFrame,
-            test_df: pd.DataFrame = None,
-            time_limit: int = 30) -> Any:
+            df: pd.DataFrame,
+            time_limit: int = 30,
+            presets: str = 'medium_quality') -> Any:
         """
         Trains AutoGluonImputer model for a single column
 
-        :param train_df: training data as dataframe
-        :param test_df: test data as dataframe; if not provided, a ratio of test_split of the
-                            training data are used as test data
-        :param test_split: if no test_df is provided this is the ratio of test data to be held
-                            separate for determining model convergence
+        :param train_df: The data used to run autogluon on.
         :param time_limit: time limit for AutoGluon in seconds
         """
 
         if self.input_columns is None:
-            self.input_columns = [c for c in train_df.columns if c is not self.output_column]
+            self.input_columns = [c for c in df.columns if c is not self.output_column]
 
-        if train_df[self.output_column].value_counts().max() < 10:
+        if df[self.output_column].value_counts().max() < 10:
             raise TargetColumnException("Maximum class count below 10, "
                                         "cannot train imputation model")
 
@@ -97,9 +93,9 @@ class AutoGluonImputer():
                                       path=self.ag_model_path,
                                       verbosity=self.verbosity,
                                       problem_type='multiclass').\
-        fit(train_data=train_df,
-            tuning_data=test_df,
+        fit(train_data=df,
             time_limit=time_limit,
+            presets=[presets],
             calibrate=True,
             verbosity=self.verbosity,
             num_cpus=25)  # funny: num_cpus expects a string, and if you pass a string, AG crashes.

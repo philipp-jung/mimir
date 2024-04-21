@@ -979,7 +979,8 @@ if __name__ == "__main__":
     pdep_features = ['pr']
     test_synth_data_direction = 'user_data'
     domain_model_threshold = 0.01
-    llm_name_corrfm = "gpt-4-turbo"
+    #llm_name_corrfm = "gpt-4-turbo"  # only use this for tax, because experiments get expensive :)
+    llm_name_corrfm = "gpt-3.5-turbo"
 
     # Set this parameter to keep runtimes low when debugging
     data = dataset.Dataset(dataset_name, error_fraction, version, error_class, n_rows)
