@@ -478,7 +478,7 @@ class Cleaning:
                                                                             pdep_tuple.gpdep / norm_sum)
             self.logger.debug('')
 
-        if 'auto_instance' in self.FEATURE_GENERATORS and len(d.labeled_tuples) == self.LABELING_BUDGET:
+        if 'auto_instance' in self.FEATURE_GENERATORS:
             self.logger.debug('Start training DataWig Models.')
 
             # Simulate user input by reading labeled data from the typed dataframe
@@ -541,7 +541,7 @@ class Cleaning:
 
         self.logger.debug('Finished generating pdep-fd features.')
         
-        if 'llm_correction' in self.FEATURE_GENERATORS and len(d.labeled_tuples) == self.LABELING_BUDGET:
+        if 'llm_correction' in self.FEATURE_GENERATORS:
             error_correction_pairs: Dict[int, List[Tuple[str, str]]] = {}
             llm_correction_args = []
             llm_correction_results = []
@@ -576,7 +576,7 @@ class Cleaning:
                     
         self.logger.debug('Finished generating llm-correction features.')
 
-        if 'llm_master' in self.FEATURE_GENERATORS and len(d.labeled_tuples) == self.LABELING_BUDGET:
+        if 'llm_master' in self.FEATURE_GENERATORS:
             # use large language model to correct an error based on the error's vicinity. Inspired by Narayan et al.
             # 2022.
             llm_master_args = []
@@ -608,7 +608,7 @@ class Cleaning:
 
         self.logger.debug('Finished generating llm-master features.')
 
-        if 'auto_instance' in self.FEATURE_GENERATORS and len(d.labeled_tuples) == self.LABELING_BUDGET:
+        if 'auto_instance' in self.FEATURE_GENERATORS:
             auto_instance_args = []
             datawig_results = []
             for (row, col) in d.detected_cells:
@@ -673,7 +673,7 @@ class Cleaning:
 
             self.logger.debug('Finished generating inferred pdep-fd features.')
 
-            if 'auto_instance' in self.FEATURE_GENERATORS and len(d.labeled_tuples) == self.LABELING_BUDGET:
+            if 'auto_instance' in self.FEATURE_GENERATORS:
                 auto_instance_args = []
                 datawig_results = []
                 for (row, col) in d.synthetic_error_cells:
@@ -774,7 +774,7 @@ class Cleaning:
 
         self.logger.debug('Finish inferring corrections.')
 
-        if self.LABELING_BUDGET == len(d.labeled_tuples) and self.DATASET_ANALYSIS:
+        if self.DATASET_ANALYSIS:
             samples = {c: random.sample(column_errors[c], min(40, len(column_errors[c]))) for c in column_errors}
             normalized_dataset = d.name
             normalized_dataset = f'{d.name}_{d.error_class}_{d.error_fraction}'
