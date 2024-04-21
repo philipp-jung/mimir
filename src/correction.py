@@ -18,7 +18,6 @@ import sklearn.tree
 import sklearn.feature_selection
 
 from typing import Dict, List, Tuple
-import pandas as pd
 
 import dataset
 import auto_instance
@@ -65,7 +64,8 @@ class Cleaning:
                  gpdep_threshold: float = 0.3,
                  fd_feature: str = 'norm_gpdep',
                  domain_model_threshold: float = 0.01,
-                 dataset_analysis: bool = False):
+                 dataset_analysis: bool = False,
+                 llm_name_corrfm: str = 'gpt-3.5-turbo'):
         """
         Parameters of the cleaning experiment.
         @param labeling_budget: How many tuples are labeled by the user. In the Baran publication, 20  labels are frequently used.
@@ -101,6 +101,7 @@ class Cleaning:
         @param fd_feature: Feature used by the the fd_instance imputer to make cleaning suggestions. Choose from ('gpdep', 'pdep', 'fd').
         @param domain_model_threshold: If a value model's correction suggestion's pr is smaller than the threshold, it is discarded.
         @param dataset_analysis: Write a detailed analysis of how Mimir cleans a a dataset to a .json file.
+        @param llm_name_corrfm: Name of the OpenAI LLM model used in et_corrfm.
         """
 
         self.SYNTH_TUPLES = synth_tuples
@@ -122,6 +123,7 @@ class Cleaning:
         self.DATASET_ANALYSIS = dataset_analysis
         self.MAX_VALUE_LENGTH = 50
         self.LABELING_BUDGET = labeling_budget
+        self.LLM_NAME_CORRFM = llm_name_corrfm
         self.logger = logging.getLogger(__name__)
 
         # TODO remove unused attributes
@@ -496,7 +498,7 @@ class Cleaning:
         Draw the positions of synthetic missing values used to gain additional training data.
         """
         error_positions = helpers.ErrorPositions(d.detected_cells, d.dataframe.shape, d.labeled_cells)
-        row_errors = error_positions.updated_row_errors()
+        row_errors = error_positions.original_row_errors()
 
         # determine error-free rows to sample from.
         candidate_rows = [(row, len(cells)) for row, cells in row_errors.items() if len(cells) == 0]
@@ -654,7 +656,7 @@ class Cleaning:
             for (row, col) in d.detected_cells:
                 old_value = d.dataframe.iloc[(row, col)]
                 if old_value != '' and error_correction_pairs.get(col) is not None:  # Skip if there is no value to be transformed or no cleaning examples
-                    llm_correction_args.append([(row, col), old_value, error_correction_pairs[col], d.name, d.error_fraction, d.version, d.error_class])
+                    llm_correction_args.append([(row, col), old_value, error_correction_pairs[col], d.name, d.error_fraction, d.version, d.error_class, self.LLM_NAME_CORRFM])
             
             if len(llm_correction_args) > 0:
                 if synchronous:
@@ -686,7 +688,7 @@ class Cleaning:
                 df_error_free_subset = d.dataframe.iloc[subset, :].copy()
                 for (row, col) in d.detected_cells:
                     df_row_with_error = d.dataframe.iloc[row, :].copy()
-                    llm_master_args.append([(row, col), df_error_free_subset, df_row_with_error, d.name, d.error_fraction, d.version, d.error_class])
+                    llm_master_args.append([(row, col), df_error_free_subset, df_row_with_error, d.name, d.error_fraction, d.version, d.error_class, 'gpt-3.5-turbo'])
                 
                 if len(llm_master_args) > 0:
                     if synchronous:
@@ -817,9 +819,6 @@ class Cleaning:
         columns_with_errors = [c for c in column_errors if len(column_errors[c]) > 0]
         pair_features = d.corrections.assemble_pair_features()
         synth_pair_features = d.inferred_corrections.assemble_pair_features()
-
-        if self.LABELING_BUDGET == len(d.labeled_tuples):
-            a = 1
 
         for j in columns_with_errors:
             if d.corrections.et_valid_corrections_made(d.corrected_cells, j) > 0:  # ET model mentioned ground truth once in suggestions
@@ -957,11 +956,11 @@ if __name__ == "__main__":
     # store results for detailed analysis
     dataset_analysis = True
 
-    dataset_name = "food"
-    error_class = 'simple_mcar'
+    dataset_name = "tax"
+    error_class = "simple_mcar"
     error_fraction = 5
     version = 1
-    n_rows = 10000
+    n_rows = 1000
 
     labeling_budget = 20
     synth_tuples = 100
@@ -970,8 +969,8 @@ if __name__ == "__main__":
     clean_with_user_input = True  # Careful: If set to False, d.corrected_cells will remain empty.
     gpdep_threshold = 0.3
     training_time_limit = 30
-    #feature_generators = ['auto_instance', 'fd', 'llm_correction', 'llm_master']
-    feature_generators = ['auto_instance']
+    feature_generators = ['auto_instance', 'fd', 'llm_correction', 'llm_master']
+    #feature_generators = ['llm_correction']
     classification_model = "ABC"
     fd_feature = 'norm_gpdep'
     vicinity_orders = [1]
@@ -980,6 +979,7 @@ if __name__ == "__main__":
     pdep_features = ['pr']
     test_synth_data_direction = 'user_data'
     domain_model_threshold = 0.01
+    llm_name_corrfm = "gpt-4-turbo"
 
     # Set this parameter to keep runtimes low when debugging
     data = dataset.Dataset(dataset_name, error_fraction, version, error_class, n_rows)
@@ -990,7 +990,7 @@ if __name__ == "__main__":
     app = Cleaning(labeling_budget, classification_model, clean_with_user_input, feature_generators, vicinity_orders,
                      vicinity_feature_generator, auto_instance_cache_model, n_best_pdeps, training_time_limit,
                      synth_tuples, synth_cleaning_threshold, test_synth_data_direction, pdep_features, gpdep_threshold,
-                     fd_feature, domain_model_threshold, dataset_analysis)
+                     fd_feature, domain_model_threshold, dataset_analysis, llm_name_corrfm)
     app.VERBOSE = True
     seed = 0
     correction_dictionary = app.run(data, seed, synchronous=True)
