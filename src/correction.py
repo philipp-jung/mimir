@@ -1,5 +1,4 @@
 import os
-import math
 import json
 import pickle
 import random
@@ -10,7 +9,6 @@ import concurrent.futures
 from itertools import combinations
 import logging
 
-import numpy as np
 import sklearn.svm
 import sklearn.ensemble
 import sklearn.linear_model
@@ -26,9 +24,6 @@ import hpo
 import helpers
 import ml_helpers
 import correctors
-
-# sample randomly to prevent sorted data messing up the sampling process.
-random.seed(0)
 
 root_logger = logging.getLogger()
 # Check if there are no handlers attached to the root logger
@@ -63,7 +58,6 @@ class Cleaning:
                  pdep_features: Tuple[str] = ('pr',),
                  gpdep_threshold: float = 0.3,
                  fd_feature: str = 'norm_gpdep',
-                 domain_model_threshold: float = 0.01,
                  dataset_analysis: bool = False,
                  llm_name_corrfm: str = 'gpt-3.5-turbo'):
         """
@@ -73,9 +67,9 @@ class Cleaning:
         cross-validation. Default is "ABC".
         @param clean_with_user_input: Take user input to clean data with. This will always improve cleaning performance,
         and is recommended to set to True as the default value. Handy to disable when debugging models.
-        @param feature_generators: Six feature generators are available: 'auto_instance', 'domain_instance', 'fd', 'vicinity',
+        @param feature_generators: Five feature generators are available: 'auto_instance', 'fd', 'vicinity',
         'llm"master', 'llm_correction'.  Pass them as strings in a list to make Mimir use them, e.g.
-        ['domain_instance', 'vicinity', 'auto_instance'].
+        ['vicinity', 'auto_instance'].
         @param vicinity_orders: The pdep approach enables the usage of higher-order dependencies to clean data. Each
         order used is passed as an integer, e.g. [1, 2]. Unary dependencies would be used by passing [1] for example.
         @param vicinity_feature_generator: How vicinity features are generated. Either 'pdep' or 'naive'. Baran uses
@@ -99,7 +93,6 @@ class Cleaning:
         dependency.
         @param gpdep_threshold: Threshold a suggestion's gpdep score must pass before it is used to generate a feature.
         @param fd_feature: Feature used by the the fd_instance imputer to make cleaning suggestions. Choose from ('gpdep', 'pdep', 'fd').
-        @param domain_model_threshold: If a value model's correction suggestion's pr is smaller than the threshold, it is discarded.
         @param dataset_analysis: Write a detailed analysis of how Mimir cleans a a dataset to a .json file.
         @param llm_name_corrfm: Name of the OpenAI LLM model used in et_corrfm.
         """
@@ -119,7 +112,6 @@ class Cleaning:
         self.PDEP_FEATURES = pdep_features
         self.GPDEP_THRESHOLD = gpdep_threshold
         self.FD_FEATURE = fd_feature
-        self.DOMAIN_MODEL_THRESHOLD = domain_model_threshold
         self.DATASET_ANALYSIS = dataset_analysis
         self.MAX_VALUE_LENGTH = 50
         self.LABELING_BUDGET = labeling_budget
@@ -154,12 +146,6 @@ class Cleaning:
             return json.dumps(list(value))
         if encoding == "unicode":
             return json.dumps([unicodedata.category(c) for c in value])
-
-    def _domain_based_model_updater(self, model, ud):
-        """
-        This method updates the domain_instance-based error corrector model with a given update dictionary.
-        """
-        self._to_model_adder(model, ud["column"], ud["new_value"])
 
     def _value_based_models_updater(self, models, ud):
         """
@@ -224,21 +210,6 @@ class Cleaning:
                 results[model_name].append(results_dictionary)
         return results
 
-    def _domain_based_corrector(self, model, ed):
-        """
-        This method takes a domain_instance-based model and an error dictionary to generate potential domain_instance-based corrections.
-        """
-        results_dictionary = {}
-        value_counts = model.get(ed["column"])
-        if value_counts is not None:
-            sum_scores = sum(model[ed["column"]].values())
-            for new_value in model[ed["column"]]:
-                pr = model[ed["column"]][new_value] / sum_scores
-                results_dictionary[new_value] = pr
-                if pr >= self.DOMAIN_MODEL_THRESHOLD:
-                    results_dictionary[new_value] = pr
-        return results_dictionary
-
     def initialize_dataset(self, d):
         """
         This method initializes the dataset.
@@ -255,27 +226,6 @@ class Cleaning:
         """
         This method initializes the error corrector models.
         """
-        if "domain" in self.FEATURE_GENERATORS:
-            d.domain_models = {}
-
-            for row in d.dataframe.itertuples():
-                i, row = row[0], row[1:]
-                # Das ist richtig cool: Jeder Wert des Tupels wird untersucht und
-                # es wird überprüft, ob dieser Wert ein aus Error Detection bekannter
-                # Fehler ist. Wenn dem so ist, wird der Wert durch das IGNORE_SIGN
-                # ersetzt.
-                vicinity_list = [cv if (i, cj) not in d.detected_cells else self.IGNORE_SIGN for cj, cv in enumerate(row)]
-                for j, value in enumerate(row):
-                    # if rhs_value's position is not a known error
-                    if (i, j) not in d.detected_cells:
-                        temp_vicinity_list = list(vicinity_list)
-                        temp_vicinity_list[j] = self.IGNORE_SIGN
-                        update_dictionary = {
-                            "column": j,
-                            "new_value": value,
-                        }
-                        self._domain_based_model_updater(d.domain_models, update_dictionary)
-
         # Initialize LLM cache
         conn = helpers.connect_to_cache()
         cursor = conn.cursor()
@@ -326,121 +276,75 @@ class Cleaning:
                     ignore_sign=self.IGNORE_SIGN)
         d.imputer_models = {}
 
-    def sample_tuple(self, d, random_seed):
+    def sample_tuple(self, d):
         """
-        This method samples a tuple.
-
-        I also added two tiers of columns to choose samples from. Either, there are error cells
-        for which no correction suggestion has been made yet. In that case, we sample from these error cells.
-        If correction suggestions have been made for all cells, we sample from error cells that have not been
-        sampled before.
+        This method samples tuples to be corrected by the user. It's a simply greedy algorithm that selects
+        tuples containing the highest number of errors for labeling.
         """
         self.logger.debug('Start tuple sampling.')
-        rng = np.random.default_rng(seed=random_seed)
-        remaining_column_unlabeled_cells = {}
-        remaining_column_unlabeled_cells_error_values = {}
-        remaining_column_uncorrected_cells = {}
-        remaining_column_uncorrected_cells_error_values = {}
 
         error_positions = helpers.ErrorPositions(d.detected_cells, d.dataframe.shape, d.labeled_cells)
+        errors_by_row = {row: len(cells) for row, cells in error_positions.original_row_errors().items()}.items()
+        random.shuffle(list(errors_by_row))  # remove order by index
+        ordered_errors_by_row = sorted(errors_by_row, key=lambda x: x[1], reverse=True)  # establish order by error count
 
-        column_errors = error_positions.original_column_errors()
+        sampled_tuples = [x[0] for x in ordered_errors_by_row[:self.LABELING_BUDGET]]
 
-        for j in column_errors:
-            for error_cell in column_errors[j]:
-                if error_cell not in d.corrected_cells:  # no correction suggestion has been found yet.
-                    self._to_model_adder(remaining_column_uncorrected_cells, j, error_cell)
-                    self._to_model_adder(remaining_column_uncorrected_cells_error_values, j,
-                                         d.dataframe.iloc[error_cell])
-                if error_cell not in d.labeled_cells:
-                    # the cell has not been labeled by the user yet. this is stricter than the above condition.
-                    self._to_model_adder(remaining_column_unlabeled_cells, j, error_cell)
-                    self._to_model_adder(remaining_column_unlabeled_cells_error_values, j, d.dataframe.iloc[error_cell])
-        tuple_score = np.ones(d.dataframe.shape[0])
-        tuple_score[list(d.labeled_tuples.keys())] = 0.0
+        for sampled_tuple in sampled_tuples:
+            self.label_with_ground_truth(d, sampled_tuple)
+            self.sampled_tuples += 1
 
-        if len(remaining_column_uncorrected_cells) > 0:
-            remaining_columns_to_choose_from = remaining_column_uncorrected_cells
-            remaining_cell_error_values = remaining_column_uncorrected_cells_error_values
-        else:
-            remaining_columns_to_choose_from = remaining_column_unlabeled_cells
-            remaining_cell_error_values = remaining_column_unlabeled_cells_error_values
-
-        for j in remaining_columns_to_choose_from:
-            for cell in remaining_columns_to_choose_from[j]:
-                value = d.dataframe.iloc[cell]
-                column_score = math.exp(len(remaining_columns_to_choose_from[j]) / len(column_errors[j]))
-                cell_score = math.exp(remaining_cell_error_values[j][value] / len(remaining_columns_to_choose_from[j]))
-                tuple_score[cell[0]] *= column_score * cell_score
-
-        # Nützlich, um tuple-sampling zu debuggen: Zeigt die Tupel, aus denen
-        # zufällig gewählt wird.
-        # print(np.argwhere(tuple_score == np.amax(tuple_score)).flatten())
-        d.sampled_tuple = rng.choice(np.argwhere(tuple_score == np.amax(tuple_score)).flatten())
-        self.sampled_tuples += 1
         self.logger.debug('Finish tuple sampling.')
 
-    def label_with_ground_truth(self, d):
+    def label_with_ground_truth(self, d, sampled_tuple):
         """
         This method labels a tuple with ground truth.
-        Takes the sampled row from d.sampled_tuple, iterates over each cell
+        Takes a sampled row from sample_tuple(), iterates over each cell
         in that row taken from the clean data, and then adds
         d.labeled_cells[(row, col)] = [is_error, clean_value_from_clean_dataframe]
         to d.labeled_cells.
         """
-        d.labeled_tuples[d.sampled_tuple] = 1
+        d.labeled_tuples[sampled_tuple] = 1
         for col in range(d.dataframe.shape[1]):
-            cell = (d.sampled_tuple, col)
+            cell = (sampled_tuple, col)
             error_label = 0
             if d.dataframe.iloc[cell] != d.clean_dataframe.iloc[cell]:
                 error_label = 1
             d.labeled_cells[cell] = [error_label, d.clean_dataframe.iloc[cell]]
-        self.logger.debug('Finished labeling with ground truth.')
+        self.logger.debug(f'Finished labeling tuple {sampled_tuple} with ground truth.')
 
     def update_models(self, d):
         """
-        This method updates the error corrector models with a new labeled tuple.
+        This method updates Baran's error corrector models with a new labeled tuple.
         """
         self.logger.debug('Start updating models.')
         cleaned_sampled_tuple = []
-        for column in range(d.dataframe.shape[1]):
-            clean_cell = d.labeled_cells[(d.sampled_tuple, column)][1]
-            cleaned_sampled_tuple.append(clean_cell)
+        for sampled_tuple in d.labeled_tuples:
+            for column in range(d.dataframe.shape[1]):
+                clean_cell = d.labeled_cells[(sampled_tuple, column)][1]
+                cleaned_sampled_tuple.append(clean_cell)
 
-        for column in range(d.dataframe.shape[1]):
-            cell = (d.sampled_tuple, column)
-            update_dictionary = {
-                "column": column,
-                "old_value": d.dataframe.iloc[cell],
-                "new_value": cleaned_sampled_tuple[column],
-            }
+            for column in range(d.dataframe.shape[1]):
+                cell = (sampled_tuple, column)
+                update_dictionary = {
+                    "column": column,
+                    "old_value": d.dataframe.iloc[cell],
+                    "new_value": cleaned_sampled_tuple[column],
+                }
 
-            # if the value in that cell has been labeled an error
-            if d.labeled_cells[cell][0] == 1:  # update domain and value models.
-                if 'domain' in self.FEATURE_GENERATORS:
-                    self._domain_based_model_updater(d.domain_models, update_dictionary)
-                if 'value' in self.FEATURE_GENERATORS:
-                    self._value_based_models_updater(d.value_models, update_dictionary)
+                # if the value in that cell has been labeled an error
+                if d.labeled_cells[cell][0] == 1:  # update value models.
+                    if 'value' in self.FEATURE_GENERATORS:
+                        self._value_based_models_updater(d.value_models, update_dictionary)
 
-                # if the cell hadn't been detected as an error
-                if cell not in d.detected_cells:
-                    # add that cell to detected_cells and assign it IGNORE_SIGN
-                    # --> das passiert, wenn die Error Detection nicht perfekt
-                    # war, dass man einen Fehler labelt, der vorher noch nicht
-                    # gelabelt war.
-                    d.detected_cells[cell] = self.IGNORE_SIGN
-
-        if 'vicinity' in self.FEATURE_GENERATORS:
-            for o in self.VICINITY_ORDERS:
-                pdep.update_vicinity_model(counts_dict=d.vicinity_models[o],
-                                           lhs_values=d.lhs_values_frequencies[o],
-                                           clean_sampled_tuple=cleaned_sampled_tuple,
-                                           error_positions=d.detected_cells,
-                                           row=d.sampled_tuple)
-        logging.debug('Finish updating models.')
-
-        if self.VERBOSE:
-            self.logger.info("The user labeled an additional tuple: {}.".format(d.sampled_tuple))
+                    # if the cell hadn't been detected as an error
+                    if cell not in d.detected_cells:
+                        # add that cell to detected_cells and assign it IGNORE_SIGN
+                        # --> das passiert, wenn die Error Detection nicht perfekt
+                        # war, dass man einen Fehler labelt, der vorher noch nicht
+                        # gelabelt war.
+                        d.detected_cells[cell] = self.IGNORE_SIGN
+            logging.debug('Finish updating models.')
 
     def _feature_generator_process(self, args):
         """
@@ -497,6 +401,7 @@ class Cleaning:
         """
         Draw the positions of synthetic missing values used to gain additional training data.
         """
+        d.synthetic_error_cells = []
         error_positions = helpers.ErrorPositions(d.detected_cells, d.dataframe.shape, d.labeled_cells)
         row_errors = error_positions.original_row_errors()
 
@@ -926,6 +831,10 @@ class Cleaning:
         multiprocessing will be used to speed up the computation by shifting expensive operations
         concurrently onto multiple cores.
         """
+
+        # This makes the sampling process deterministic.
+        random.seed(random_seed)
+
         d = self.initialize_dataset(d)
         if len(d.detected_cells) == 0:
             raise ValueError('There are no errors in the data to correct.')
@@ -933,22 +842,21 @@ class Cleaning:
             self.logger.info(f"Start Mimir To Correct Dataset {d.name}\n")
         self.initialize_models(d)
 
-        while len(d.labeled_tuples) <= self.LABELING_BUDGET:
-            self.draw_synth_error_positions(d)
-            self.prepare_augmented_models(d, synchronous)
-            self.generate_features(d, synchronous)
-            self.generate_inferred_features(d, synchronous)
-            self.binary_predict_corrections(d)
-            self.clean_with_user_input(d)
-            self.sample_tuple(d, random_seed=random_seed)
-            self.label_with_ground_truth(d)
-            self.update_models(d)
+        self.sample_tuple(d)
+        self.update_models(d)
 
-            if self.VERBOSE:
-                p, r, f = d.get_data_cleaning_evaluation(d.corrected_cells)[-3:]
-                self.logger.info(
-                    "Cleaning performance on {}:\nPrecision = {:.2f}\nRecall = {:.2f}\nF1 = {:.2f}\n".format(d.name, p, r,
-                                                                                                           f))
+        self.draw_synth_error_positions(d)
+        self.prepare_augmented_models(d, synchronous)
+        self.generate_features(d, synchronous)
+        self.generate_inferred_features(d, synchronous)
+        self.binary_predict_corrections(d)
+        self.clean_with_user_input(d)
+
+        if self.VERBOSE:
+            p, r, f = d.get_data_cleaning_evaluation(d.corrected_cells)[-3:]
+            self.logger.info(
+                "Cleaning performance on {}:\nPrecision = {:.2f}\nRecall = {:.2f}\nF1 = {:.2f}\n".format(d.name, p, r,
+                                                                                                        f))
         return d.corrected_cells
 
 
@@ -956,11 +864,11 @@ if __name__ == "__main__":
     # store results for detailed analysis
     dataset_analysis = True
 
-    dataset_name = "tax"
+    dataset_name = "beers"
     error_class = "simple_mcar"
     error_fraction = 5
     version = 1
-    n_rows = 1000
+    n_rows = None
 
     labeling_budget = 20
     synth_tuples = 100
@@ -969,7 +877,8 @@ if __name__ == "__main__":
     clean_with_user_input = True  # Careful: If set to False, d.corrected_cells will remain empty.
     gpdep_threshold = 0.3
     training_time_limit = 30
-    feature_generators = ['auto_instance', 'fd', 'llm_correction', 'llm_master']
+    #feature_generators = ['auto_instance', 'fd', 'llm_correction', 'llm_master']
+    feature_generators = []
     #feature_generators = ['llm_correction']
     classification_model = "ABC"
     fd_feature = 'norm_gpdep'
@@ -978,7 +887,6 @@ if __name__ == "__main__":
     vicinity_feature_generator = "naive"
     pdep_features = ['pr']
     test_synth_data_direction = 'user_data'
-    domain_model_threshold = 0.01
     #llm_name_corrfm = "gpt-4-turbo"  # only use this for tax, because experiments get expensive :)
     llm_name_corrfm = "gpt-3.5-turbo"
 
@@ -991,7 +899,7 @@ if __name__ == "__main__":
     app = Cleaning(labeling_budget, classification_model, clean_with_user_input, feature_generators, vicinity_orders,
                      vicinity_feature_generator, auto_instance_cache_model, n_best_pdeps, training_time_limit,
                      synth_tuples, synth_cleaning_threshold, test_synth_data_direction, pdep_features, gpdep_threshold,
-                     fd_feature, domain_model_threshold, dataset_analysis, llm_name_corrfm)
+                     fd_feature, dataset_analysis, llm_name_corrfm)
     app.VERBOSE = True
-    seed = 0
-    correction_dictionary = app.run(data, seed, synchronous=True)
+    random_seed = 0
+    correction_dictionary = app.run(data, random_seed, synchronous=True)

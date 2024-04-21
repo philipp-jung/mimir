@@ -157,43 +157,6 @@ def mine_all_counts(
 
     return d, lhs_values
 
-
-def update_vicinity_model(
-    counts_dict: dict, lhs_values: dict, clean_sampled_tuple: list, error_positions: dict, row: int
-) -> None:
-    """
-    Update the data structures counts_dict and lhs_values_frequencies with user inputs.
-    They are required to calculate gpdeps.
-    """
-    for lhs_cols in counts_dict:
-        lhs_vals = tuple(clean_sampled_tuple[lhs_col] for lhs_col in lhs_cols)
-        lhs_contains_error = any(
-            [(row, lhs_col) in error_positions for lhs_col in lhs_cols]
-        )
-
-        for rhs_col in range(len(clean_sampled_tuple)):  # todo: Only update if there was an error before.
-            rhs_contains_error = (row, rhs_col) in error_positions
-            any_cell_contains_error = any([lhs_contains_error, rhs_contains_error])
-            if rhs_col not in lhs_cols:
-                if any_cell_contains_error:  # update only if previously error existed
-                    if counts_dict[lhs_cols][rhs_col].get(lhs_vals) is None:
-                        counts_dict[lhs_cols][rhs_col][lhs_vals] = {}
-
-                    # Update counts of values in the LHS
-                    if lhs_values[lhs_cols][rhs_col].get(lhs_vals) is None:
-                        lhs_values[lhs_cols][rhs_col][lhs_vals] = 1
-                    else:
-                        lhs_values[lhs_cols][rhs_col][lhs_vals] += 1
-
-                    rhs_val = clean_sampled_tuple[rhs_col]
-                    if counts_dict[lhs_cols][rhs_col].get(lhs_vals) is None:
-                        counts_dict[lhs_cols][rhs_col][lhs_vals] = {}
-                    if counts_dict[lhs_cols][rhs_col][lhs_vals].get(rhs_val) is None:
-                        counts_dict[lhs_cols][rhs_col][lhs_vals][rhs_val] = 1.0
-                    else:
-                        counts_dict[lhs_cols][rhs_col][lhs_vals][rhs_val] += 1.0
-
-
 def expected_pdep(
     n_rows: int,
     counts_dict: dict,
