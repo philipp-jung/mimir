@@ -1,0 +1,1 @@
+{"status": 1, "result": {"precision": 0.8719512195121951, "recall": 0.8428290766208252, "f1": 0.8571428571428572, "runtime": 4.795576572418213}, "config": {"dataset": "hospital", "n_rows": null, "error_fraction": 1, "error_class": "simple_mcar", "cripple": null, "run": 1}}

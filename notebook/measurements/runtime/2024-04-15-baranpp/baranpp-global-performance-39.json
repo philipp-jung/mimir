@@ -1,0 +1,1 @@
+{"status": 1, "result": {"precision": 0.5894736842105263, "recall": 0.36129032258064514, "f1": 0.448, "runtime": 81.62394905090332}, "config": {"dataset": "restaurant", "n_rows": null, "error_fraction": 3, "error_class": "simple_mcar", "run": 0}}

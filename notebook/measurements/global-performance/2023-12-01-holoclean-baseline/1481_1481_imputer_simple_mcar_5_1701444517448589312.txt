@@ -1,0 +1,1 @@
+{"precision": 1.0, "recall": 1.0, "repair_recall": 1.0, "f1": 1.0, "repair_f1": 1.0, "detected_errors": 50.0, "total_errors": 50.0, "correct_repairs": 50.0, "total_repairs": 50.0, "total_repairs_grdt": 50.0, "total_repairs_grdt_correct": 0, "total_repairs_grdt_incorrect": 50.0}

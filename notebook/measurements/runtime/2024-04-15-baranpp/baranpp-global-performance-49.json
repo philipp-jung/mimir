@@ -1,0 +1,1 @@
+{"status": 1, "result": {"precision": 0.92, "recall": 0.45098039215686275, "f1": 0.6052631578947368, "runtime": 2404.33087849617}, "config": {"dataset": "6", "n_rows": 1000, "error_fraction": 5, "error_class": "simple_mcar", "run": 1}}

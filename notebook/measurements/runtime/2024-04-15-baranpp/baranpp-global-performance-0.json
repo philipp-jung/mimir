@@ -1,0 +1,1 @@
+{"status": 1, "result": {"precision": 0.9988196411709159, "recall": 0.9699679046309032, "f1": 0.9841823679925563, "runtime": 425.9244828224182}, "config": {"dataset": "beers", "n_rows": null, "error_fraction": 1, "error_class": "simple_mcar", "run": 0}}

@@ -1,0 +1,1 @@
+{"status": 1, "result": {"precision": 0.8507462686567164, "recall": 0.6627906976744186, "f1": 0.7450980392156863, "runtime": 1.2626948356628418}, "config": {"dataset": "glass", "n_rows": null, "error_fraction": 3, "error_class": "simple_mcar", "cripple": null, "run": 0}}

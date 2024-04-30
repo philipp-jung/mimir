@@ -1,0 +1,1 @@
+{"status": 1, "result": {"precision": 0.9314516129032258, "recall": 0.4873417721518987, "f1": 0.6398891966759003, "runtime": 17.095364809036255}, "config": {"dataset": "rayyan", "n_rows": null, "error_fraction": 1, "error_class": "simple_mcar", "cripple": null, "run": 0}}

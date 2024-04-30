@@ -1,0 +1,30 @@
+.DS_Store
+.idea/
+raha/.idea/
+.ipynb_checkpoints/
+__pycache__/
+*.egg-info/
+agModels/
+raha/__pycache__/
+
+**/venv/
+*/datawigModels/
+*/AutogluonModels
+**/.env
+**/.vscode/
+datasets/export_metanome/*
+
+# HyFDMirmir
+HyFDMimir/
+
+# infra
+infrastructure/jobs/
+
+# in-detail analysis 
+src/analysis/
+
+# cached stuff
+src/tmp/*
+
+# measurement results
+src/measurements/*

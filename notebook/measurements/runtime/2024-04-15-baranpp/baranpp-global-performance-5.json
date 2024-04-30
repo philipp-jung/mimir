@@ -1,0 +1,1 @@
+{"status": 1, "result": {"precision": 0.6551568494696457, "recall": 0.5900406504065041, "f1": 0.6208961608384129, "runtime": 517.5048131942749}, "config": {"dataset": "flights", "n_rows": null, "error_fraction": 1, "error_class": "simple_mcar", "run": 2}}

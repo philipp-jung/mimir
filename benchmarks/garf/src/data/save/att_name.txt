@@ -1,0 +1,1 @@
+{0: 'ID', 1: 'RIVER', 2: 'LOCATION', 3: 'ERECTED', 4: 'PURPOSE', 5: 'LENGTH', 6: 'LANES', 7: 'CLEAR-G', 8: 'T-OR-D', 9: 'MATERIAL', 10: 'SPAN', 11: 'REL-L', 12: 'TYPE'}
