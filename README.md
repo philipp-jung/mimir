@@ -2,6 +2,9 @@
 Mimir is a state-of-the-art error correction system.
 
 ## Installation
+These instructions have been tested on MacOS 14.5 on an Apple M2 Chip.
+
+### Recommended: Installation via Conda
 Mimir can be executed on any platform using `conda` or `mamba`.
 To install Mimir on your machine, follow these steps:
 
@@ -18,7 +21,7 @@ Follow these instructions to clean data with `mimir`:
 1) Run `python correction.py` to correct sample data errors. Set parameters at the bottom of `correction.py` to adjust the correction process.
 
 ## Experiments
-To run our experiments, consider the `README.md` file in the the `infrastructure/` directory.
+To run our experiments, consider the `README.md` file in the the `benchmarks/` directory.
 
 ## Notebook
 In the `notebook/` directory, we provide the code used to generate all figures used in the Mimir publication.

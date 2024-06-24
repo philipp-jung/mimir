@@ -23,8 +23,5 @@ infrastructure/jobs/
 # in-detail analysis 
 src/analysis/
 
-# cached stuff
-src/tmp/*
-
 # measurement results
 src/measurements/*

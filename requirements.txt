@@ -6,7 +6,6 @@ scikit-learn>=1.0.2
 pytest>=7.0.1
 openai==0.27.6
 autogluon==0.8.2
-scikit-learn==1.0.2
 python-dotenv==1.0.0
 pyyaml==6.0.1
 tqdm==4.66.1
