@@ -1,4 +1,4 @@
-FROM python:3.10.12
+FROM continuumio/miniconda3
 
 COPY src/ /app
 COPY datasets/ /datasets
@@ -6,14 +6,11 @@ COPY infrastructure/ /infrastructure
 
 WORKDIR /app
 
-COPY requirements.txt /app
+COPY environment.yml /app
 
-RUN apt-get update && apt-get install -y openjdk-17-jdk
+RUN apt-get update
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -y openjdk-17-jdk
 
-RUN pip install -U pip
+RUN conda env create -n mimir -f environment.yml
 
-RUN pip install -U setuptools wheel
-
-RUN pip install -r requirements.txt
-
-CMD ["python", "entrypoint.py", "--dedicated", "--saved-config=global-performance"]
+ENTRYPOINT ["conda", "run", "-n", "mimir", "python", "entrypoint.py"]

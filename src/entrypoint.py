@@ -1,3 +1,4 @@
+import os
 import json
 import yaml
 import time
@@ -140,23 +141,34 @@ def load_dedicated_experiments(saved_config: str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Start experiment either on a k8s cluster, or on a dedicated machine.')
     parser.add_argument('--saved-config', type=str, help='Name of the saved experiment configuration.', default=None)
+    parser.add_argument('--dedicated', action='store_true', help='Whether or not to run a dedicated experiment', default=False)
 
     args = parser.parse_args()
 
     # Load OpenAI API-key
     dotenv.load_dotenv()
 
-    if args.saved_config is None:
-        raise ValueError('No saved config specified to load experiment from.')
-
-    configs = load_dedicated_experiments(args.saved_config)
-    print(f'Start measurement for experiment {args.saved_config}.')
-
-    results_path = Path('measurements/')
+    results_path = Path('/measurements/')
     results_path.mkdir(parents=True, exist_ok=True)
-    for i, config in enumerate(tqdm(configs)):
-        experiment_id = f'{args.saved_config}-{i}'
-        experiment_id = experiment_id.replace('_', '-')
+
+    if args.dedicated:  # dedicated mode
+        if args.saved_config is None:
+            raise ValueError('No saved config specified to load experiment from.')
+
+        configs = load_dedicated_experiments(args.saved_config)
+        print(f'Start measurement for experiment {args.saved_config}.')
+
+        for i, config in enumerate(tqdm(configs)):
+            experiment_id = f'{args.saved_config}-{i}'
+            experiment_id = experiment_id.replace('_', '-')
+            result = run_mirmir(config)
+            with open(results_path / f"{experiment_id}.json", 'wt') as f:
+                json.dump(result, f)
+    else:  # k8s mode
+        if os.getenv('CONFIG') is None or os.getenv('EXPERIMENT_ID') is None:
+            raise ValueError('config or experiment_id ENV VARs are not set')
+        config = json.loads(os.getenv('CONFIG'))
+        experiment_id = os.getenv('EXPERIMENT_ID')
         result = run_mirmir(config)
         with open(results_path / f"{experiment_id}.json", 'wt') as f:
             json.dump(result, f)

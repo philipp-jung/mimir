@@ -37,6 +37,10 @@ def generate_job(config: dict, experiment_name: str, jobs_path: Path, id: int):
     Generates a kubernetes job config to run a mirmir experiment.
     """
 
+    memory = '64Gi'
+    if config['dataset'] in ['tax', 'food']:
+        memory = '950Gi'
+
     template = """apiVersion: batch/v1
 kind: Job 
 metadata:
@@ -54,8 +58,8 @@ spec:
           operator: Exists
           effect: NoSchedule
       containers:
-        - name: mirmir
-          image: docker.io/larmor27/mirmir:latest
+        - name: mimir
+          image: docker.io/larmor27/mimir:latest
           env:
             - name: CONFIG
               value: '{}'
@@ -64,26 +68,40 @@ spec:
           volumeMounts:
             - name: mirmir-results-volume
               mountPath: /measurements  # Mounting the PVC at /app/output directory in the container
+            - name: ag-models-volume
+              mountPath: /agModels  # Mounting the ephemeral volume at /agModels directory in the container
           resources:
             requests:
               # only start on nodes with 64Gi of RAM available 
-              memory: "64Gi"   
+              memory: "{}"   
               # only start on nodes with 26 CPU cores available
-              cpu: 26   
+              cpu: 26
             limits:
               # kill the pod when it uses more than 64Gi of RAM
-              memory: "64Gi"  
+              memory: "{}"  
               # restrict the pod to never use more than 26 full CPU cores
               cpu: 26
       volumes:
         - name: mirmir-results-volume
           persistentVolumeClaim:
             claimName: mirmir-results-volume
+        - name: ag-models-volume
+          ephemeral:
+            volumeClaimTemplate:
+              metadata:
+                labels:
+                  type: my-frontend-volume
+              spec:
+                accessModes: [ "ReadWriteOnce" ]
+                storageClassName: "cephcsi"
+                resources:
+                  requests:
+                    storage: 30G
     """
 
     unique_id = f'{experiment_name}-{id}'
     unique_id = unique_id.replace('_', '-')
-    job_config = template.format(unique_id, unique_id, json.dumps(config), unique_id)
+    job_config = template.format(unique_id, unique_id, json.dumps(config), unique_id, memory, memory)
     with open(jobs_path / f'{unique_id}.yml', 'wt') as f:
         f.write(job_config)
 
@@ -96,15 +114,19 @@ def load_experiment(saved_config: str):
         config = yaml.safe_load(f)
 
     experiment_name = config['experiment_name']
-    baran_configs = combine_configs(ranges=config['ranges_baran'],
-                                    config=config['config_baran'],
-                                    runs=config['runs'])
-    renuver_configs = combine_configs(ranges=config['ranges_renuver'],
-                                      config=config['config_renuver'],
-                                      runs=config['runs'])
-    openml_configs = combine_configs(ranges=config['ranges_openml'],
-                                     config=config['config_openml'],
-                                     runs=config['runs'])
+    baran_configs, renuver_configs, openml_configs = [], [], []
+    if config.get('config_baran'):
+        baran_configs = combine_configs(ranges=config['ranges_baran'],
+                                        config=config['config_baran'],
+                                        runs=config['runs'])
+    if config.get('config_renuver'):
+        renuver_configs = combine_configs(ranges=config['ranges_renuver'],
+                                          config=config['config_renuver'],
+                                          runs=config['runs'])
+    if config.get('config_openml'):
+        openml_configs = combine_configs(ranges=config['ranges_openml'],
+                                         config=config['config_openml'],
+                                         runs=config['runs'])
 
     print(f'Successfully loaded experiment configuration from {saved_config}.')
 
