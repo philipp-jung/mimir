@@ -2,27 +2,21 @@ from pathlib import Path, PosixPath
 import pandas as pd
 import json
 from matplotlib import pyplot as plt
-from matplotlib import patches
 import matplotlib.patches as mpatches
 import matplotlib.gridspec as gridspec
-from matplotlib.ticker import MultipleLocator, NullFormatter, NullLocator
+from matplotlib.ticker import MultipleLocator
 import seaborn as sns
 from typing import List, Tuple, Dict
-import datetime
 import warnings
+
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
+BARAN_DATASETS = ['beers', 'flights', 'food', 'hospital', 'rayyan', 'tax']
+OPENML_DATASETS = ['6', '137', '151', '184', '1481', '41027', '43572']
+RENUVER_DATASETS = ['bridges', 'cars', 'glass', 'restaurant']
+RENUVER_NORMALIZED_DATASETS = ['bridges 1%', 'bridges 3%', 'cars 1%', 'cars 3%', 'glass 1%', 'glass 3%', 'restaurant 1%', 'restaurant 3%']
 
-BARAN_DATASETS = ['beers', 'flights', 'rayyan', 'hospital', 'tax', 'food']
-OPENML_DATASETS = ['6', '137', '151', '184', '1481', '41027', '43572',]
-RENUVER_DATASETS = ['glass', 'bridges', 'restaurant', 'cars']
-
-TEXTWIDTH_PT = 241.1474
-TEXTWIDTH_IN = TEXTWIDTH_PT / 72.27
-FIGURE_WIDTH = TEXTWIDTH_IN
-FIGURE_HEIGHT = 16/9 * FIGURE_WIDTH
-
-PATTERN_PALETTE = ['///', '...', '\\\\\\', '++', 'xx', 'OO']
+PATTERN_PALETTE = ['|', '', '//', '++', '\\\\\\', 'OO']
 
 ABLATION_BAR_CUSTOM_LABELS = {
     'all models': 'All Correctors',
@@ -31,7 +25,7 @@ ABLATION_BAR_CUSTOM_LABELS = {
     'fd': '(no) SC_Phodi',
     'auto_instance': '(no) IM_DataWig',
 }
-ABLATION_SCATTER_CUSTOM_LABELS = {
+ABLATION_CORRECTOR_LABELS = {
     'all models': 'All Correctors',
     'auto_instance': 'IM_DataWig',
     'no auto_instance': 'no IM_DataWig',
@@ -55,8 +49,8 @@ ABLATION_PATTERN_MAP = {
 }
 
 
-ACHSEN_FONTSIZE = 12
-REST_FONTSIZE = ACHSEN_FONTSIZE - 3
+ACHSEN_FONTSIZE = 9
+REST_FONTSIZE = ACHSEN_FONTSIZE - 1
 
 ABLATION_COLUMN_ORDER_1 = list(reversed(['all models', 'no llm_master', 'no llm_correction',  'no fd', 'no auto_instance',]))
 ABLATION_COLUMN_ORDER_2 = list(reversed(['all models', 'llm_master', 'llm_correction',  'fd', 'auto_instance',]))
@@ -64,10 +58,10 @@ ABLATION_COLUMN_ORDER_2 = list(reversed(['all models', 'llm_master', 'llm_correc
 ABLATION_COLOR_PALETTE = sns.color_palette("Set3", 6)
 
 MIMIR_LABEL_COLORS = {
-    'no auto_instance': ABLATION_COLOR_PALETTE[0],
-    'no fd': ABLATION_COLOR_PALETTE[2],
-    'no llm_correction': ABLATION_COLOR_PALETTE[3],
-    'no llm_master': ABLATION_COLOR_PALETTE[4],
+    'no auto_instance': '#cae3e0',
+    'no fd': '#dedde8',
+    'no llm_correction': '#f9c6c0',
+    'no llm_master': '#c3d6e1',
     'All Correctors': ABLATION_COLOR_PALETTE[5],
     'all models': ABLATION_COLOR_PALETTE[5],
     'Mimir': ABLATION_COLOR_PALETTE[5],
@@ -76,14 +70,14 @@ MIMIR_LABEL_COLORS = {
     'llm_correction': ABLATION_COLOR_PALETTE[3],
     'llm_master': ABLATION_COLOR_PALETTE[4],
     'IM_DataWig': ABLATION_COLOR_PALETTE[0],
-    'no IM_DataWig': ABLATION_COLOR_PALETTE[0],
+    'no IM_DataWig': '#cae3e0',
     'RD_ImpFM': ABLATION_COLOR_PALETTE[4],
-    'no RD_ImpFM': ABLATION_COLOR_PALETTE[4],
+    'no RD_ImpFM': '#c3d6e1',
     'SC_Phodi': ABLATION_COLOR_PALETTE[2],
-    'no SC_Phodi': ABLATION_COLOR_PALETTE[2],
+    'no SC_Phodi': '#dedde8',
     'ET_CorrFM': ABLATION_COLOR_PALETTE[3],
-    'no ET_CorrFM': ABLATION_COLOR_PALETTE[3],
-    'f1_et_corr': ABLATION_COLOR_PALETTE[3],
+    'no ET_CorrFM': '#f9c6c0',
+    #'f1_et_corr': ABLATION_COLOR_PALETTE[3],
     'value_model': '#999999', # baran value models
     'Ensembled Value Model': '#999999',
     'Ensembled SC_Phodi': ABLATION_COLOR_PALETTE[2],
@@ -92,6 +86,44 @@ MIMIR_LABEL_COLORS = {
     'Vicinity Model': '#999999',
     'Baran': '#999999',
 }
+
+def set_size(width, fraction=1):
+    """Set figure dimensions to avoid scaling in LaTeX.
+
+    Parameters
+    ----------
+    width: float
+            Document textwidth or columnwidth in pts
+    fraction: float, optional
+            Fraction of the width which you wish the figure to occupy
+
+    Returns
+    -------
+    fig_dim: tuple
+            Dimensions of figure in inches
+    """
+    # Width of figure (in pts)
+    fig_width_pt = width * fraction
+
+    # Convert from pt to inches
+    inches_per_pt = 1 / 72.27
+
+    # Golden ratio to set aesthetic figure height
+    # https://disq.us/p/2940ij3
+    golden_ratio = (5**.5 - 1) / 2
+
+    # Figure width in inches
+    fig_width_in = fig_width_pt * inches_per_pt
+    # Figure height in inches
+    fig_height_in = fig_width_in * golden_ratio
+
+    fig_dim = (fig_width_in, fig_height_in)
+
+    return fig_dim
+
+COLUMNWIDTH_PT = 238.96417
+FIGURE_HEIGHT, FIGURE_WIDTH = set_size(COLUMNWIDTH_PT)
+
 
 def load_result(path_to_result: str):
     """
@@ -261,16 +293,16 @@ def hc_experiment_metadata_from_filename(filename: str):
             'error_class': error_class, 
             'timestamp': timestamp}
 
+
 def normalize_dataset(row):
     if row['error_fraction'] == '':
         return row['dataset']
-    elif row['dataset'] in BARAN_DATASETS:
+    elif row['dataset'] in BARAN_DATASETS or row['dataset'] in OPENML_DATASETS:
         return row['dataset']
-    elif (row.get('error_class', '') == '') or (row.get('error_class', '') is None):
+    elif row['dataset'] in RENUVER_DATASETS:
         return f"{row['dataset']} {int(row['error_fraction'])}%"
-    elif row.get('error_class', '').startswith('imputer'):
-        return f"{row['dataset']} \n cat {int(row['error_fraction'])}%"
     return f"{row['dataset']} {int(row['error_fraction'])}%"
+
 
 def get_ablation_study(ablation_study_dir: str):
     measurements = []
@@ -311,7 +343,7 @@ def plot_global_ablation_study(ablation_study_dir: str) -> Tuple[plt.figure, Tup
     sub_pivot_df1 = pivot_df[ABLATION_COLUMN_ORDER_1]
 
     # Create a figure and two sub-plots
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(FIGURE_WIDTH*2, FIGURE_HEIGHT), sharey=True)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(FIGURE_WIDTH*2, FIGURE_HEIGHT*2), sharey=True)
 
     # Plot the first sub-plot
     sub_pivot_df1.plot(kind='barh', ax=ax1, color=[MIMIR_LABEL_COLORS[label] for label in sub_pivot_df1.columns], legend=False, width=0.65)
@@ -352,7 +384,7 @@ def ablation_scatter(mimir_ablation_path: str) -> Tuple[plt.figure, plt.axes, Li
     pivot_df = df.pivot(index='normal_dataset', columns='feature_generators', values='f1')
 
     # Plotting with Seaborn
-    fig, ax = plt.subplots(nrows=1, ncols=1, constrained_layout=True, figsize=(FIGURE_WIDTH, FIGURE_HEIGHT))
+    fig, ax = plt.subplots(nrows=1, ncols=1, constrained_layout=True, figsize=(2*FIGURE_WIDTH, 2*FIGURE_HEIGHT))
 
     # Plotting other models
     for col in pivot_df.columns:
@@ -365,7 +397,7 @@ def ablation_scatter(mimir_ablation_path: str) -> Tuple[plt.figure, plt.axes, Li
 
     # Adjust legend position
     handles, _ = ax.get_legend_handles_labels()
-    labels = [ABLATION_SCATTER_CUSTOM_LABELS[c] for c in pivot_df.columns if c != 'all models']
+    labels = [ABLATION_CORRECTOR_LABELS[c] for c in pivot_df.columns if c != 'all models']
     ax.legend(handles, labels, loc='center left', bbox_to_anchor=(1, 0.5), ncol=1, frameon=True, title='Ablations')
 
     # Set axis labels
@@ -380,6 +412,140 @@ def ablation_scatter(mimir_ablation_path: str) -> Tuple[plt.figure, plt.axes, Li
     ax.set_ylim(-.05,1.05)
 
     return fig, ax, failed_measurements
+    
+
+def plot_ablation(ablation_study_dir: str, corrector: str, subset=True):
+    df_global, failed_experiments = get_ablation_study(ablation_study_dir)
+    df_global = df_global.groupby(['dataset', 'feature_generators', 'error_fraction', 'error_class']).agg({'f1': 'mean',
+                                                                                        'precision': 'mean',
+                                                                                        'recall': 'mean',
+                                                                                        'run': list}).reset_index()
+    df_global['normal_dataset'] = df_global.apply(normalize_dataset, axis=1)
+    
+    if subset:  # filter out renuver 3% datasets because they do not contribute new insights to ablation
+        df_global = df_global[~df_global['normal_dataset'].str.contains('3%')]
+    
+    pivot_df = df_global.pivot(index='normal_dataset', columns='feature_generators', values='f1')
+    pivot_df.columns = [ABLATION_CORRECTOR_LABELS.get(x) for x in pivot_df.columns]
+    
+    df = pivot_df.loc[:, ['All Correctors', corrector, f'no {corrector}']]
+
+    DATASETS_ORDER = list(reversed(OPENML_DATASETS)) + list(reversed(RENUVER_NORMALIZED_DATASETS)) + list(reversed(BARAN_DATASETS))
+    DATASETS_ORDER = [x for x in DATASETS_ORDER if not '3%' in x]
+    # Reindex the DataFrame according to the sorted index
+    df = df.reindex(index=DATASETS_ORDER)
+
+    # Create a figure and two sub-plots
+    fig, ax = plt.subplots(1, 1, figsize=(FIGURE_WIDTH*1.5, FIGURE_HEIGHT*1.5))
+
+    df.plot(kind='barh', ax=ax, rot=0, color=[MIMIR_LABEL_COLORS[label] for label in df.columns], legend=False, width=.75)
+    ax.set_ylabel('Dataset', labelpad=0, fontsize=ACHSEN_FONTSIZE)
+    ax.set_xlabel('$F_1$ score', labelpad=-8, fontsize=ACHSEN_FONTSIZE)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    ax.set_xticks([0.0, 1.0])  # Set x-axis ticks
+
+    # Remove ticks from the y-axis
+    ax.tick_params(axis='y', which='both', left=False, labelleft=True, pad=0, labelsize=REST_FONTSIZE)
+
+    
+    # Set custom y-axis labels with colors
+    y_labels = df.index.to_list()
+
+    datasets_worse = [d for d in y_labels if (df.loc[d, 'All Correctors'] + 0.05) < df.loc[d, f'no {corrector}']]
+    datasets_better = [d for d in y_labels if df.loc[d, 'All Correctors'] > (df.loc[d, f'no {corrector}'] + 0.05)]
+    y_colors = ['red' if dataset in datasets_worse else 'black' for dataset in y_labels]
+    y_colors = ['green' if dataset in datasets_better else c for c, dataset in zip(y_colors, y_labels)]
+    
+    ax.set_yticks(range(len(y_labels)))
+    ax.set_yticklabels(y_labels, rotation=0)
+
+    for tick_label, color in zip(ax.get_yticklabels(), y_colors):
+        tick_label.set_color(color)
+
+    annotations = {d: {} for d in (datasets_better + datasets_worse)}
+    for group_index, c in enumerate(ax.containers):
+        for i, bar in enumerate(c):
+            # Get the y-value corresponding to the current bar
+            label = ax.get_yticklabels()[i].get_text()
+            
+            # Check if the label is in relevant_datasets
+            if annotations.get(label) is not None:
+                # Add label to the specific bar
+                annotations[label][group_index] = {
+                    'text': f'{bar.get_width():.2f}', 
+                    'xy': (bar.get_width(), bar.get_y() + bar.get_height() / 2),
+                    'xytext': (1, 0)}
+    
+    if corrector == 'SC_Phodi':
+        annotations['flights'][2]['xytext'] = (1,1)
+        annotations['flights'][0]['xytext'] = (1,-1)
+    
+    if corrector == 'ET_CorrFM':
+        annotations['beers'][2]['xytext'] = (1,1)
+        annotations['beers'][1]['xytext'] = (1,1)
+        annotations['beers'][0]['xytext'] = (1,-2)
+
+        annotations['rayyan'][2]['xytext'] = (1,1)
+        annotations['rayyan'][1]['xytext'] = (1,1)
+        annotations['rayyan'][0]['xytext'] = (1,-2)
+
+        annotations['tax'][2]['xytext'] = (1,1)
+        annotations['tax'][1]['xytext'] = (1,1)
+        annotations['tax'][0]['xytext'] = (1,-2)
+
+        annotations['cars 1%'][2]['xytext'] = (1,1)
+        annotations['cars 1%'][1]['xytext'] = (1,1)
+        annotations['cars 1%'][0]['xytext'] = (1,-2)
+        
+        annotations['glass 1%'][2]['xytext'] = (1,1)
+        annotations['glass 1%'][1]['xytext'] = (1,1)
+        annotations['glass 1%'][0]['xytext'] = (1,-2)
+
+    if corrector == 'IM_DataWig':
+        annotations['flights'][2]['xytext'] = (1,1)
+        annotations['flights'][0]['xytext'] = (1,-1)
+
+        annotations['food'][2]['xytext'] = (1,1)
+        annotations['food'][0]['xytext'] = (1,-1)
+
+        annotations['6'][2]['xytext'] = (1,1)
+        annotations['6'][1]['xytext'] = (1,1)
+        annotations['6'][0]['xytext'] = (1,-2)
+ 
+        annotations['137'][2]['xytext'] = (1,1)
+        annotations['137'][1]['xytext'] = (1,1)
+        annotations['137'][0]['xytext'] = (1,-2)
+ 
+        annotations['151'][2]['xytext'] = (1,1)
+        annotations['151'][1]['xytext'] = (1,1)
+        annotations['151'][0]['xytext'] = (1,-2)
+ 
+        annotations['41027'][2]['xytext'] = (1,1)
+        annotations['41027'][1]['xytext'] = (1,1)
+        annotations['41027'][0]['xytext'] = (1,-1)
+        
+    if corrector == 'RD_ImpFM':
+        annotations['43572'][2]['xytext'] = (1,1)
+        annotations['43572'][1]['xytext'] = (1,1)
+        annotations['43572'][0]['xytext'] = (1,-2)
+
+    for dataset in annotations:
+        for group_index in annotations[dataset]:
+            a = annotations[dataset][group_index]
+            ax.annotate(a['text'],
+                        xy=a['xy'],
+                        xytext=a['xytext'],
+                        textcoords="offset points",
+                        ha='left', va='center',
+                        fontsize=REST_FONTSIZE)
+    handles, labels = ax.get_legend_handles_labels()
+    # sort both labels and handles by labels
+    labels, handles = zip(*sorted(zip(labels, handles), key=lambda t: t[0], reverse=True))
+    ax.legend(handles, labels, ncol=3, loc='lower center', bbox_to_anchor=(0.39, -0.12), fontsize=REST_FONTSIZE-2)
+
+    return fig, ax, df
 
 
 def plot_joint_ablation(ablation_study_dir: str, baranpp_global_performance_dir: str, mimir_global_performance_dir: str) -> Tuple[plt.figure, Tuple[plt.axes, plt.axes], List]:
@@ -648,7 +814,7 @@ def plot_local_ablation_study(ablation_study_dir: str) -> Tuple[plt.figure, Tupl
 
     fig.legend(custom_handles, ABLATION_BAR_CUSTOM_LABELS.values(), title='Correctors', 
             title_fontsize=ACHSEN_FONTSIZE, loc='lower center', fontsize=REST_FONTSIZE,
-            bbox_to_anchor=(0.5, -0.15, 0, 0), ncol=len(ABLATION_BAR_CUSTOM_LABELS)//2, frameon=False)
+            bbox_to_anchor=(0.5, -0.25, 0, 0), ncol=len(ABLATION_BAR_CUSTOM_LABELS)//2, frameon=False)
 
     return fig, (ax1, ax2), failed_measurements 
 
@@ -685,11 +851,14 @@ def get_mimir_result(mimir_results_path: str) -> Tuple[List[dict], List]:
     print(f'Loaded Mimir Results. {len(failed_measurements)}/{len(res_mimir)} measurements failed.')
 
     res_mimir = [{**m['config'], **m['result'], 'ensemble': 'Mimir', 'dataset_group': get_dataset_group(m['config']['dataset'])} for m in res_mimir if m['status'] == 1]  # some measurements crash
-    res_mimir = [m for m in res_mimir if not (m['dataset_group'] == 'OpenML' and m['error_fraction'] == 1)]
+    
     res_mimir = [{**m, 'normalized_dataset': normalize_dataset(m)} for m in res_mimir]
 
-    # filter out 1% on OpenML because these are always perfectly cleaned
-    res_mimir = [r for r in res_mimir if not (r['dataset'] in OPENML_DATASETS and str(r['error_fraction']) == '1')]
+    # Filter out 1pct OpenML because they're always perfectly cleaned
+    res_mimir = [m for m in res_mimir if not (m['dataset_group'] == 'OpenML' and m['error_fraction'] == 1)]
+    # Filter out non-categorical OpenML
+    res_mimir = [r for r in res_mimir if not (r['dataset_group'] == 'OpenML' and 'simple_mcar' == r['error_class'])]
+
     return res_mimir, failed_measurements
 
 def get_holoclean_global_performance(holoclean_results_path: str):
@@ -703,13 +872,13 @@ def get_holoclean_global_performance(holoclean_results_path: str):
             hc_results.append({**measurement, **metadata})
 
     hc_results = [{**m, 'ensemble': 'HoloClean'} for m in hc_results]
-    hc_results = [{'normalized_dataset': normalize_dataset(m), **m} for m in hc_results]
+    hc_results = [{'normalized_dataset': normalize_dataset(m), 'dataset_group': get_dataset_group(m['dataset']), **m} for m in hc_results]
 
     # filter out 1% on OpenML because these are always perfectly cleaned
-    hc_results = [r for r in hc_results if not (r['dataset'] in OPENML_DATASETS and str(r['error_fraction']) == '1')]
+    hc_results = [r for r in hc_results if not (r['dataset_group'] == 'OpenML' and str(r['error_fraction']) == '1')]
 
-    # Filter out 2%, 4%, 5% on RENUVER because others don't measure it.
-    hc_results = [r for r in hc_results if not (r['dataset'] in RENUVER_DATASETS and str(r['error_fraction']) in ['2', '4', '5'])]
+    # Filter out 2%, 4%, 5% on RENUVER because other systems don't measure it.
+    hc_results = [r for r in hc_results if not (r['dataset_group'] == "Renuver" and str(r['error_fraction']) in ['2', '4', '5'])]
     return hc_results
 
 def get_garf_global_performance(garf_results_path: str):
@@ -727,18 +896,19 @@ def get_garf_global_performance(garf_results_path: str):
                 'ed_p': r.get('ed_p'),
                 'ed_r': r.get('ed_r'),
                 'ed_f': r.get('ed_f'),
-                'precision': r.get('et_p'),
-                'recall': r.get('et_r'),
-                'f1': r.get('et_f'),
+                'precision': r.get('ec_p'),
+                'recall': r.get('ec_r'),
+                'f1': r.get('ec_f'),
                 'error_class': r.get('error_class'),
+                'dataset_group': get_dataset_group(r['dataset']),
                 'error_fraction': r.get('error_fraction')} for r in results] 
 
     # filter out 1% on OpenML because these are always perfectly cleaned
     # and 10% on OpenML because others don't measure it.
-    results = [r for r in results if not (r['dataset'] in OPENML_DATASETS and str(r['error_fraction']) in ['1', '10'])]
+    results = [r for r in results if not (r['dataset_group'] == 'OpenML' and str(r['error_fraction']) in ['1', '10'])]
     
     # Filter out 2%, 4%, 5% on RENUVER because others don't measure it.
-    results = [r for r in results if not (r['dataset'] in RENUVER_DATASETS and str(r['error_fraction']) in ['2', '4', '5'])]
+    results = [r for r in results if not (r['dataset_group'] == 'Renuver' and str(r['error_fraction']) in ['2', '4', '5'])]
     return results
 
 def plot_mimir_vs_baran(res_baran: list[dict], res_mimir: list[dict]) -> Tuple[plt.figure, plt.axes, pd.DataFrame, List]:
@@ -772,8 +942,7 @@ def plot_mimir_vs_baran(res_baran: list[dict], res_mimir: list[dict]) -> Tuple[p
     ax.set_yticks([0.0, 0.25, 0.5, 0.75, 1.0])
 
     # Add legend
-    ax.legend(loc='upper center',
-            bbox_to_anchor=(0.5, 1.1), 
+    ax.legend(loc='best',
             fontsize=8, 
             ncol=len(df_melt['ensemble'].unique())
             )
@@ -783,51 +952,76 @@ def plot_mimir_vs_baran(res_baran: list[dict], res_mimir: list[dict]) -> Tuple[p
 
     return fig, ax, df_melt
 
-
-def performance_table(mimir_results_path: str, baran_results_path: str, baran_experiment_name: str, garf_results_path: str, holoclean_results_path: str) -> Tuple[pd.DataFrame, List]:
+def performance_table(mimir_results_path, baran_results_path, baranpp_results_path, garf_results_path, holoclean_results_path, full_metrics=True) -> Tuple[pd.DataFrame, List]:
+    DATASETS_ORDER = BARAN_DATASETS + RENUVER_DATASETS + OPENML_DATASETS
+    
     res_mimir, failed_measurements = get_mimir_result(mimir_results_path)
-    res_mimir = [{'normalized_dataset': r['normalized_dataset'],
-                   'ensemble': r['ensemble'],
-                   'f1': r['f1'],
-                   'precision': r['precision'],
-                   'recall': r['recall']} for r in res_mimir]
+    res_mimir = [{**r, 'ensemble': 'Mimir'} for r in res_mimir]
 
-    res_baran = get_baran_experiment(baran_results_path, baran_experiment_name)
-    res_baran = [{'normalized_dataset': r['normalized_dataset'],
-                   'ensemble': r['ensemble'],
-                   'f1': r['f1'],
-                   'precision': r['precision'],
-                   'recall': r['recall']} for r in res_baran]
+    res_baran, failed_measurements = get_mimir_result(baran_results_path)
+    res_baran = [{**r, 'ensemble': 'Baran'} for r in res_baran]
+
+    res_baranpp, failed_measurements = get_mimir_result(baranpp_results_path)
+    res_baranpp = [{**r, 'ensemble': 'Baran++'} for r in res_baranpp]
 
     res_hc = get_holoclean_global_performance(holoclean_results_path)
     res_hc = [{'normalized_dataset': r['normalized_dataset'],
-                   'ensemble': r['ensemble'],
-                   'f1': r['f1'],
-                   'precision': r['precision'],
-                   'recall': r['recall']} for r in res_hc]
+                'ensemble': r['ensemble'],
+                'dataset_group': r['dataset_group'],
+                'error_class': r['error_class'],
+                'f1': r['f1'],
+                'precision': r['precision'],
+                'recall': r['recall']} for r in res_hc]
+    res_hc = [r for r in res_hc if not (r['dataset_group'] == 'OpenML' and 'simple_mcar' == r['error_class'])]
 
     res_garf = get_garf_global_performance(garf_results_path)
     res_garf = [{'normalized_dataset': r['normalized_dataset'],
-                   'ensemble': r['ensemble'],
-                   'f1': r['f1'],
-                   'precision': r['precision'],
-                   'recall': r['recall']} for r in res_garf]
-    df = pd.DataFrame([*res_mimir, *res_baran, *res_hc, *res_garf])
+                'ensemble': r['ensemble'],
+                'dataset_group': r['dataset_group'],
+                'error_class': r['error_class'],
+                'f1': r['f1'],
+                'precision': r['precision'],
+                'recall': r['recall']} for r in res_garf]
+    res_garf = [r for r in res_garf if not (r['dataset_group'] == 'OpenML' and 'simple_mcar' == r['error_class'])]
 
-    return (pd.pivot((df.loc[:, ['normalized_dataset', 'ensemble', 'f1']]
-            .groupby(['normalized_dataset', 'ensemble'])
-            .agg({'f1': 'mean'})
-            .reset_index()),
-            columns='ensemble',
-            index='normalized_dataset',
-            values='f1')
-            .round(2)
-           ), failed_measurements
+    df = pd.DataFrame([*res_mimir, *res_baranpp, *res_baran, *res_hc, *res_garf])
+    
+    if full_metrics:
+        df_results = (pd.pivot((df.loc[:, ['normalized_dataset', 'ensemble', 'f1', 'precision', 'recall']]
+                .groupby(['normalized_dataset', 'ensemble'])
+                .agg({'f1': 'mean', 'precision': 'mean', 'recall': 'mean'})
+                .reset_index()
+                ),
+                columns='ensemble',
+                index='normalized_dataset',
+                values=['f1', 'precision', 'recall'])
+                .round(2)
+                )
+        df_results.columns = df_results.columns.swaplevel(0,1)  # group by correction system
+        df_results.sort_index(inplace=True, axis=1)  # sort columns
 
-def et_corrfm_vs_value_model_v2(mimir_result_dir: str) -> Tuple[plt.figure, List[plt.axes], pd.DataFrame]:
-    """
-    Neue Version des Plots, in der das Value Model in Mimir implementiert ist.
-    """
+    else:
+        df_results = (pd.pivot((df.loc[:, ['normalized_dataset', 'ensemble', 'f1']]
+                    .groupby(['normalized_dataset', 'ensemble'])
+                    .agg({'f1': 'mean'})
+                    .reset_index()
+                    ),
+                    columns='ensemble',
+                    index='normalized_dataset',
+                    values='f1')
+                    .round(2)
+                )
+    
+    df_results.sort_index(inplace=True, 
+                          key=lambda index: [DATASETS_ORDER.index(x[0]) for x in index.str.split(' ')],
+                          axis=0
+                         )
+
+    df_results = df_results.loc[:, ['Mimir', 'Baran++', 'Baran', 'HoloClean', 'Garf']]  # order columns
+    return df_results
+
+
+def et_corrfm_vs_value_model(mimir_result_dir: str) -> Tuple[plt.figure, List[plt.axes], pd.DataFrame]:
     res_mimir, failed_measurements = get_mimir_result(mimir_result_dir)
     res_mimir = [{'normalized_dataset': r['normalized_dataset'],
                    'feature_generators': format_feature_generators(r['feature_generators']),
@@ -848,19 +1042,20 @@ def et_corrfm_vs_value_model_v2(mimir_result_dir: str) -> Tuple[plt.figure, List
     df_bars = df[df['normalized_dataset'].isin(dataset_subset)]
     df_bars = df_bars[df_bars['feature_generators'].isin(['llm_correction', 'value_model'])]
 
-    fig = plt.figure(constrained_layout=True)
-    axes = fig.subplot_mosaic([[0, 1],[2, 2]])
+    fig = plt.figure(figsize=(2*FIGURE_HEIGHT, 2*FIGURE_WIDTH), constrained_layout=True)
+    axes = fig.subplot_mosaic([['.', 0, 0, 1, 1], ['.', 0, 0, 1, 1], ['.', 2, 2, 2, 2]])
     palette = sns.color_palette('Set3')
 
     # Remove spines
     #sns.despine()
 
+    annotations = {'precision': {}, 'recall': {}}
     for i, measure, label in [(0, 'precision', 'Precision'), (1, 'recall', 'Recall')]:
         sns.scatterplot(x=df_scatter[measure]['value_model'], y=df_scatter[measure]['llm_correction'], ax=axes[i], color=palette[4])
         sns.lineplot(x=[-.2, 1.2], y=[-.2, 1.2], ax=axes[i], color='black', linewidth=.8)
         
-        axes[i].set_xlabel(f'{label} Value Model', fontsize=ACHSEN_FONTSIZE)
-        axes[i].set_ylabel(f'{label} ET_CorrFM', fontsize=ACHSEN_FONTSIZE)
+        axes[i].set_xlabel(f'{label} Value Model', fontsize=ACHSEN_FONTSIZE, labelpad=-9)
+        axes[i].set_ylabel(f'{label} ET_CorrFM', fontsize=ACHSEN_FONTSIZE, labelpad=-6)
 
         axes[i].xaxis.set_minor_locator(MultipleLocator(0.25))  # Set major ticks every 0.25
         axes[i].yaxis.set_minor_locator(MultipleLocator(0.25))  # Set major ticks every 0.25
@@ -874,28 +1069,82 @@ def et_corrfm_vs_value_model_v2(mimir_result_dir: str) -> Tuple[plt.figure, List
         # Plot highlighted datasets
         axes[i].scatter(x=df_scatter_subset[measure]['value_model'], y=df_scatter_subset[measure]['llm_correction'], color='black')
 
-        # Annotate the scatter plot for 'hospital' dataset
-        for d in dataset_subset:
-            x_value, y_value = df_scatter[df_scatter.index == d][measure]['value_model'], df_scatter[df_scatter.index == d][measure]['llm_correction']
-            axes[i].annotate(d, (x_value, y_value), textcoords="offset points", xytext=(10, 10), ha="right", va="top", fontsize=8)
+        # Annotate the scatter plot
+        for dataset in dataset_subset:
+            x_value, y_value = df_scatter[df_scatter.index == dataset][measure]['value_model'], df_scatter[df_scatter.index == dataset][measure]['llm_correction']
+            annotations[measure][dataset] = {'type': 'annotate', 'coordinates': (x_value, y_value), 'xytext': (0, 10)}
+            
+    # Manually define annotations that look bad
+    annotations['precision']['tax']['xytext'] = (-3, 9)
+    annotations['precision']['food']['xytext'] = (19, 10)
+    annotations['precision']['hospital']['xytext'] = (-2, -4)
+    annotations['precision']['cars 3%']['xytext'] = (0, 9)
+
+    annotations['precision']['flights']['type'] = 'arrow'
+    annotations['precision']['flights']['xytext'] = (0, 20)
+
+    annotations['precision']['rayyan']['type'] = 'arrow'
+    annotations['precision']['rayyan']['xytext'] = (-20, -25)
+
+    annotations['precision']['cars 1%']['type'] = 'arrow'
+    annotations['precision']['cars 1%']['xytext'] = (-5, -25)
+
+    annotations['precision']['beers']['type'] = 'arrow'
+    annotations['precision']['beers']['xytext'] = (18, -12)
+
+    annotations['precision']['glass 1%']['type'] = 'arrow'
+    annotations['precision']['glass 1%']['xytext'] = (13, -20)
+
+    annotations['precision']['glass 3%']['type'] = 'arrow'
+    annotations['precision']['glass 3%']['xytext'] = (-25, -20)
+
+    annotations['recall']['food']['xytext'] = (20, -1)
+    annotations['recall']['beers']['xytext'] = (21, 9)
+    annotations['recall']['glass 1%']['xytext'] = (32, 0)
+    annotations['recall']['glass 3%']['xytext'] = (-4, -2)
+    annotations['recall']['hospital']['xytext'] = (-4, 0)
+    annotations['recall']['rayyan']['xytext'] = (27, -1)
+    annotations['recall']['tax']['xytext'] = (-3, 9)
+
+    annotations['recall']['cars 3%']['type'] = 'arrow'
+    annotations['recall']['cars 3%']['xytext'] = (25, -4)
+
+    annotations['recall']['flights']['type'] = 'arrow'
+    annotations['recall']['flights']['xytext'] = (0, 20)
+
+        
+    for i, measure in enumerate(annotations.keys()):
+        for dataset in annotations[measure]:
+            an = annotations[measure][dataset]
+            if an['type'] == 'annotate':
+                axes[i].annotate(dataset, an['coordinates'], textcoords="offset points", xytext=an['xytext'], ha="right", va="top", fontsize=REST_FONTSIZE)
+            elif an['type'] == 'arrow':
+                axes[i].annotate(dataset,
+                                 an['coordinates'],
+                                 textcoords="offset points",
+                                 xytext=an['xytext'],
+                                 arrowprops={'arrowstyle': '->'},
+                                 fontsize=REST_FONTSIZE)
+            else:
+                raise ValueError('unknown annotation type')
 
     df['feature_generators'] = df['feature_generators'].replace('all models', 'Ensembled llm_correction')
     custom_order = ['llm_correction', 'value_model', 'Ensembled llm_correction', 'Ensembled Value Model']
-    sns.boxplot(y='feature_generators', x='f1', data=df, ax=axes[2], palette=MIMIR_LABEL_COLORS, order=custom_order)
+    sns.boxplot(y='feature_generators', x='f1', data=df, ax=axes[2], palette=MIMIR_LABEL_COLORS, order=custom_order, width=.6)
     custom_labels = ['ET_CorrFM', 'Value Model', 'Ensembled ET_CorrFM', 'Ensembled Value Model']
 
     axes[2].set_yticklabels(custom_labels)
 
     axes[2].set_xlabel('$F_1$ score', fontsize=ACHSEN_FONTSIZE)
     axes[2].set_ylabel('')
-    axes[2].tick_params(axis='y', labelsize=ACHSEN_FONTSIZE)
+
+    axes[2].tick_params(axis='y', labelsize=REST_FONTSIZE)  # make datasets not too large
     axes[2].tick_params(axis='x', labelsize=REST_FONTSIZE)
     axes[2].set_xticks([0, .2, .4, .6, .8, 1])
     axes[2].set_xlim(-.05, 1.05)
 
     letters = ['a', 'b', 'c']
     for i, ax in axes.items():
-        ax.yaxis.set_label_coords(-0.2, 0.5)  # Adjust the position of y-axis label
         # Add label in the bottom right corner
         x, y = -0.04, -0.135
         if i == 2:
@@ -903,7 +1152,6 @@ def et_corrfm_vs_value_model_v2(mimir_result_dir: str) -> Tuple[plt.figure, List
         ax.text(x, y, f'{letters[i]})', transform=ax.transAxes,
                 ha='right', va='bottom', bbox=dict(facecolor='white', alpha=0.8, edgecolor='white'),
             fontsize=REST_FONTSIZE)
-
 
     return fig, axes, df_scatter
 
@@ -923,19 +1171,17 @@ def sc_phodi_vs_vicinity_model(mimir_phodi_vs_vicinity_dir: str) -> Tuple[plt.fi
 
     df_pivot = pd.pivot(df, columns='feature_generators', index='normalized_dataset', values=['f1', 'precision', 'recall'])
 
-    fig = plt.figure(constrained_layout=True)
-    axes = fig.subplot_mosaic([[0, 1],[2, 2]])
-    palette = sns.color_palette('Set3')
+    fig = plt.figure(figsize=(2*FIGURE_HEIGHT, 2*FIGURE_WIDTH), constrained_layout=True)
+    axes = fig.subplot_mosaic([['.', 0, 0, 1, 1], ['.', 0, 0, 1, 1], ['.', 2, 2, 2, 2]])
 
-    # Remove spines
-    #sns.despine()
+    annotations = {'precision': {}, 'recall': {}}
 
     for i, measure, label in [(0, 'precision', 'Precision'), (1, 'recall', 'Recall'),]:
         sns.scatterplot(x=df_pivot[measure]['Vicinity Model'], y=df_pivot[measure]['SC_Phodi'], ax=axes[i], color='black')
         sns.lineplot(x=[-.2, 1.2], y=[-.2, 1.2], ax=axes[i], color='black', linewidth=.8)
         
-        axes[i].set_xlabel(f'{label} Vicinity Model', fontsize=ACHSEN_FONTSIZE)
-        axes[i].set_ylabel(f'{label} SC_Phodi', fontsize=ACHSEN_FONTSIZE)
+        axes[i].set_xlabel(f'{label} Vicinity Model', fontsize=ACHSEN_FONTSIZE, labelpad=-9)
+        axes[i].set_ylabel(f'{label} SC_Phodi', fontsize=ACHSEN_FONTSIZE, labelpad=-6)
 
         axes[i].xaxis.set_minor_locator(MultipleLocator(0.25))  # Set major ticks every 0.25
         axes[i].yaxis.set_minor_locator(MultipleLocator(0.25))  # Set major ticks every 0.25
@@ -943,24 +1189,45 @@ def sc_phodi_vs_vicinity_model(mimir_phodi_vs_vicinity_dir: str) -> Tuple[plt.fi
         axes[i].set_yticks([0, 1])
         axes[i].set_xlim(-.05,1.05)
         axes[i].set_ylim(-.05,1.05)
-        
+        axes[i].tick_params(axis='y', labelsize=REST_FONTSIZE)
+        axes[i].tick_params(axis='x', labelsize=REST_FONTSIZE)
         axes[i].set_aspect('equal', adjustable='box')
-        
+
+        x_value, y_value = df_pivot[df_pivot.index == 'flights'][measure]['Vicinity Model'], df_pivot[df_pivot.index == 'flights'][measure]['SC_Phodi']
+        annotations[measure]['flights'] = {'type': 'arrow', 'coordinates': (x_value, y_value), 'xytext': (0, 10)}
+
+    
+    annotations['precision']['flights']['xytext'] = (-10, -20)
+    annotations['recall']['flights']['xytext'] = (-35, 10)
+
+    for i, measure in enumerate(annotations.keys()):
+        for dataset in annotations[measure]:
+            an = annotations[measure][dataset]
+            if an['type'] == 'annotate':
+                axes[i].annotate(dataset, an['coordinates'], textcoords="offset points", xytext=an['xytext'], ha="right", va="top", fontsize=REST_FONTSIZE)
+            elif an['type'] == 'arrow':
+                axes[i].annotate(dataset,
+                                 an['coordinates'],
+                                 textcoords="offset points",
+                                 xytext=an['xytext'],
+                                 arrowprops={'arrowstyle': '->'},
+                                 fontsize=REST_FONTSIZE)
+            else:
+                raise ValueError('unknown annotation type')
+
 
     sns.boxplot(y='feature_generators', x='f1', data=df, ax=axes[2], palette=MIMIR_LABEL_COLORS, order=custom_order)
-    # sns.swarmplot(data=df, x='f1', y='feature_generators', color="black", size=3.5, dodge=True, legend=False, ax=axes[2])
 
     axes[2].set_xlabel('$F_1$ score', fontsize=ACHSEN_FONTSIZE)
     axes[2].set_ylabel('')
 
-    axes[2].tick_params(axis='y', labelsize=REST_FONTSIZE)
+    axes[2].tick_params(axis='y', labelsize=REST_FONTSIZE)  # make datasets not too large
     axes[2].tick_params(axis='x', labelsize=REST_FONTSIZE)
     axes[2].set_xticks([0, .2, .4, .6, .8, 1])
     axes[2].set_xlim(-.05, 1.05)
 
     letters = ['a', 'b', 'c']
     for i, ax in axes.items():
-        ax.yaxis.set_label_coords(-0.2, 0.5)  # Adjust the position of y-axis label
         # Add label in the bottom right corner
         x, y = -0.04, -0.135
         if i == 2:
@@ -970,3 +1237,49 @@ def sc_phodi_vs_vicinity_model(mimir_phodi_vs_vicinity_dir: str) -> Tuple[plt.fi
             fontsize=REST_FONTSIZE)
 
     return fig, axes, failed_measurements
+
+def plot_runtime(mimir_result_dir: str, baran_result_dir: str, baranpp_result_dir: str, correct_timeouts):
+    res_mimir_runtime, failed_measurements = get_mimir_result(mimir_result_dir)
+    res_baran_runtime, failed_measurements = get_mimir_result(baran_result_dir)
+    res_baranpp_runtime, failed_measurements = get_mimir_result(baranpp_result_dir)
+    
+    res_baran_runtime = [r for r in res_baran_runtime if not (r['dataset_group'] == 'OpenML' and 'simple_mcar' == r['error_class'])]
+    res_baranpp_runtime = [r for r in res_baranpp_runtime if not (r['dataset_group'] == 'OpenML' and 'simple_mcar' == r['error_class'])]
+
+    DATASETS_ORDER = BARAN_DATASETS + RENUVER_DATASETS + OPENML_DATASETS
+    res_mimir_runtime.sort(key=lambda x: DATASETS_ORDER.index(x['normalized_dataset'].split(' ')[0]), reverse=True)
+    res_baran_runtime.sort(key=lambda x: DATASETS_ORDER.index(x['normalized_dataset'].split(' ')[0]), reverse=True)
+    res_baranpp_runtime.sort(key=lambda x: DATASETS_ORDER.index(x['normalized_dataset'].split(' ')[0]), reverse=True)
+
+    fig, ax = plt.subplots(figsize=(2*FIGURE_HEIGHT, 2*FIGURE_WIDTH))
+    
+    if correct_timeouts:
+        timeout_datasets = [
+            {'normalized_dataset': 'tax', 'runtime': 1E4},
+            {'normalized_dataset': 'tax', 'runtime': 1E4},
+            {'normalized_dataset': 'tax', 'runtime': 1E4},
+            {'normalized_dataset': 'food', 'runtime': 1E4},
+            {'normalized_dataset': 'food', 'runtime': 1E4},
+            {'normalized_dataset': 'food', 'runtime': 1E4},
+        ]
+        res_baranpp_runtime = res_baranpp_runtime + timeout_datasets
+    ax.scatter([r['runtime'] for r in res_mimir_runtime], [r['normalized_dataset'] for r in res_mimir_runtime], label='Mimir', marker='*')
+    ax.scatter([r['runtime'] for r in res_baran_runtime], [r['normalized_dataset'] for r in res_baran_runtime], label='Baran', marker='.')
+    ax.scatter([r['runtime'] for r in res_baranpp_runtime], [r['normalized_dataset'] for r in res_baranpp_runtime], label='Baran++', marker='+')
+
+
+    ax.axvline(10000, color='#4e4e4d', linestyle='-', linewidth=.5)
+    ax.annotate('Time  Limit', xy=(10000, 1), xytext=(5450, -0.81), horizontalalignment='left', color='#4e4e4d', fontsize=REST_FONTSIZE)
+    
+    plt.ylabel('Dataset', fontsize=ACHSEN_FONTSIZE)
+    plt.xlabel('Runtime (s)', fontsize=ACHSEN_FONTSIZE)
+    plt.xscale('log')  # Set x-axis scale to logarithmic
+    plt.legend(fontsize=REST_FONTSIZE)
+    ax.spines['left'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.tick_params(axis='both', which='both', bottom=False, left=False, labelsize=REST_FONTSIZE)
+    #plt.grid(axis='x', linestyle=':')
+    plt.grid(axis='y', linestyle=':')
+    return fig, ax
