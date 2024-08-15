@@ -1,4 +1,4 @@
-# Mimir: A Holistic Value Imputation System
+# Mimir: A Holistic Error Correction System
 Mimir is a state-of-the-art error correction system.
 ![Schematic view of the Mimir error correction system](notebook/img/mimir.png)
 
