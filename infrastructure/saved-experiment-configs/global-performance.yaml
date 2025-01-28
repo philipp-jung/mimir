@@ -36,6 +36,7 @@ config_baran:
     - pr
   fd_feature: "norm_gpdep"
   sampling_technique: "greedy"
+  detection_mode: "perfect"
 
 
 ranges_gpt4:
@@ -70,6 +71,7 @@ config_gpt4:
     - pr
   fd_feature: "norm_gpdep"
   sampling_technique: "greedy"
+  detection_mode: "perfect"
 
 
 ranges_renuver:
@@ -110,6 +112,7 @@ config_renuver:
     - pr
   fd_feature: "norm_gpdep"
   sampling_technique: "greedy"
+  detection_mode: "perfect"
 
 ranges_openml:
   dataset:
@@ -149,5 +152,6 @@ config_openml:
     - pr
   fd_feature: "norm_gpdep"
   sampling_technique: "greedy"
+  detection_mode: "perfect"
 
 runs: 3

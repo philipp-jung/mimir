@@ -142,7 +142,7 @@ def connect_to_cache() -> sqlite3.Connection:
     Connect to the cache for LLM prompts.
     @return: a connection to the sqlite3 cache.
     """
-    conn = sqlite3.connect('cache.db')
+    conn = sqlite3.connect('../datasets/llm_cache.db')
     return conn
 
 

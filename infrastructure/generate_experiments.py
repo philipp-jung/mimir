@@ -39,7 +39,7 @@ def generate_job(config: dict, experiment_name: str, jobs_path: Path, id: int):
 
     memory = '64Gi'
     if config['dataset'] in ['tax', 'food']:
-        memory = '950Gi'
+        memory = '500Gi'
 
     template = """apiVersion: batch/v1
 kind: Job 
@@ -61,11 +61,18 @@ spec:
         - name: mimir
           image: docker.io/larmor27/mimir:latest
           env:
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openapi-api-key
+                  key: OPENAPI_API_KEY
             - name: CONFIG
               value: '{}'
             - name: EXPERIMENT_ID
               value: {}
           volumeMounts:
+            - name: mimir-datasets-volume
+              mountPath: /datasets  # Mounting the PVC at /app/output directory in the container
             - name: mirmir-results-volume
               mountPath: /measurements  # Mounting the PVC at /app/output directory in the container
             - name: ag-models-volume
@@ -82,6 +89,9 @@ spec:
               # restrict the pod to never use more than 26 full CPU cores
               cpu: 26
       volumes:
+        - name: mimir-datasets-volume
+          persistentVolumeClaim:
+            claimName: mimir-datasets-volume
         - name: mirmir-results-volume
           persistentVolumeClaim:
             claimName: mirmir-results-volume
@@ -114,7 +124,11 @@ def load_experiment(saved_config: str):
         config = yaml.safe_load(f)
 
     experiment_name = config['experiment_name']
-    baran_configs, renuver_configs, openml_configs = [], [], []
+    large_configs, baran_configs, renuver_configs, openml_configs = [], [], [], []
+    if config.get('config_large'):
+        large_configs = combine_configs(ranges=config['ranges_large'],
+                                        config=config['config_large'],
+                                        runs=config['runs'])
     if config.get('config_baran'):
         baran_configs = combine_configs(ranges=config['ranges_baran'],
                                         config=config['config_baran'],
@@ -131,7 +145,7 @@ def load_experiment(saved_config: str):
     print(f'Successfully loaded experiment configuration from {saved_config}.')
 
     # merge configs
-    configs = [*baran_configs, *renuver_configs, *openml_configs]
+    configs = [*large_configs, *baran_configs, *renuver_configs, *openml_configs]
 
     jobs_path = Path('jobs/')
     jobs_path.mkdir(parents=True, exist_ok=True)

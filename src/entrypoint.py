@@ -22,7 +22,7 @@ def run_mirmir(c: dict):
 
     try:
         data = dataset.Dataset(c['dataset'], c['error_fraction'], version, c['error_class'], c["n_rows"])
-        data.detected_cells = data.get_errors_dictionary()
+        data.detected_cells = data.get_errors_dictionary(c['detection_mode'])
 
         app = correction.Cleaning(
             c["labeling_budget"],
@@ -44,7 +44,7 @@ def run_mirmir(c: dict):
             c['llm_name_corrfm'],
             c['sampling_technique'],
         )
-        app.VERBOSE = False
+        app.VERBOSE = True
         seed = None
         correction_dictionary = app.run(data, seed, synchronous=False)
         end_time = time.time()

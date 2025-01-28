@@ -1,6 +1,15 @@
 import os
+import json
+from pathlib import Path
 from typing import Union, Dict, Tuple
 import pandas as pd
+
+OPENML_DATSET_IDS = ["725", "310", "1046", "823", "137", "42493", "4135", "251", "151", "40922", "40498", "30", "1459", "1481", "184", "375", "32", "41027", "6", "40685", "43572"]
+HPI_DATASET_IDS = ["cddb"]
+RENUVER_DATASET_IDS = ["bridges", "cars", "glass", "restaurant"]
+BARAN_DATASET_IDS = ["beers", "flights", "hospital", "tax", "rayyan", "toy", "debug", "synth-debug", "food"]
+UCI_DATASET_IDS = ["adult", "breast-cancer", "letter", "nursery"]
+
 
 class Dataset:
     """
@@ -35,16 +44,11 @@ class Dataset:
         """
         self.repaired_dataframe = None  # to be assigned after cleaning suggestions were applied.
         self.error_fraction = None
-        self.version = None
+        self.version = version
         self.error_class = None
+        self.raha_result_path = "../datasets/raha-detection-results/"
 
-        openml_dataset_ids = ["725", "310", "1046", "823", "137", "42493", "4135", "251", "151", "40922", "40498", "30", "1459", "1481", "184", "375", "32", "41027", "6", "40685", "43572"]
-        hpi_dataset_ids = ["cddb"]
-        renuver_dataset_ids = ["bridges", "cars", "glass", "restaurant"]
-        baran_dataset_ids = ["beers", "flights", "hospital", "tax", "rayyan", "toy", "debug", "synth-debug", "food"]
-        uci_dataset_ids = ["adult", "breast-cancer", "letter", "nursery"]
-
-        if dataset_name in baran_dataset_ids:
+        if dataset_name in BARAN_DATASET_IDS:
             self.path = f"../datasets/{dataset_name}/dirty.csv"
             self.clean_path = f"../datasets/{dataset_name}/clean.csv"
             if dataset_name == 'food':
@@ -55,7 +59,7 @@ class Dataset:
                 self.typed_clean_path = self.clean_path  # no parquet file is available.
             self.name = dataset_name
 
-        elif dataset_name in renuver_dataset_ids:
+        elif dataset_name in RENUVER_DATASET_IDS:
             self.path = f"../datasets/renuver/{dataset_name}/{dataset_name}_{error_fraction}_{version}.csv"
             self.clean_path = f"../datasets/renuver/{dataset_name}/clean.csv"
             self.parquet_path = self.path  # no parquet file is available.
@@ -63,9 +67,8 @@ class Dataset:
 
             self.name = dataset_name
             self.error_fraction = error_fraction
-            self.version = version
 
-        elif dataset_name in hpi_dataset_ids:
+        elif dataset_name in HPI_DATASET_IDS:
             if error_class is None:
                 raise ValueError('Please specify the error class with which the openml dataset has been corrupted.')
             self.path = f"../datasets/{dataset_name}/{error_class}_{error_fraction}.csv"
@@ -77,7 +80,7 @@ class Dataset:
             self.error_class = error_class
             self.error_fraction = error_fraction
 
-        elif dataset_name in openml_dataset_ids:
+        elif dataset_name in OPENML_DATSET_IDS:
             if error_class is None:
                 raise ValueError('Please specify the error class with which the openml dataset has been corrupted.')
             self.path = f"../datasets/openml/{dataset_name}/{error_class}_{error_fraction}.csv"
@@ -89,7 +92,7 @@ class Dataset:
             self.error_class = error_class
             self.error_fraction = error_fraction
 
-        elif dataset_name in uci_dataset_ids:
+        elif dataset_name in UCI_DATASET_IDS:
             self.path = f"../datasets/{dataset_name}/MCAR/dirty_{error_fraction}.csv"
             self.clean_path = f"../datasets/{dataset_name}/clean.csv"
             self.parquet_path = self.path  # no parquet file is available.
@@ -188,12 +191,40 @@ class Dataset:
         """
         return self.get_dataframes_difference(self.clean_dataframe, self.dataframe)
 
-    def get_errors_dictionary(self) -> Dict[Tuple[int, int], str]:
+    def get_errors_dictionary(self, mode: 'str') -> Dict[Tuple[int, int], str]:
         """
         This method compares the clean and dirty versions of a dataset. The returned dictionary resolves to the error
         values in the dirty dataframe.
+
+        There are two modes: 'perfect' to simulate perfect error detection ahead, or 'raha', which loads imperfect
+        error positions that we detected with raha.
         """
-        return self.get_dataframes_difference(self.dataframe, self.clean_dataframe)
+        if mode == 'perfect':
+            return self.get_dataframes_difference(self.dataframe, self.clean_dataframe)
+        if mode == 'raha':
+            raha_results = []
+            for file_path in Path(self.raha_result_path).glob('*.json'):
+                with open(file_path, 'rt') as f:
+                    raha_results.append(json.load(f))
+            
+            if self.name in BARAN_DATASET_IDS:
+                relevant_result = [r for r in raha_results if (r['dataset_name'] == self.name and r['version'] == self.version)]
+            elif self.name in RENUVER_DATASET_IDS:
+                relevant_result = [r for r in raha_results if (r['dataset_name'] == self.name and r['version'] == self.version and r['error_fraction'] == self.error_fraction)]
+            elif self.name in OPENML_DATSET_IDS:
+                relevant_result = [r for r in raha_results if (r['dataset_name'] == self.name and r['version'] == self.version and r['error_fraction'] == self.error_fraction and r['error_class'] == self.error_class)]
+            else:
+                raise ValueError('No raha results were measured for this dataset.')
+
+            if len(relevant_result) != 1:
+                raise ValueError('Ambiguous choice of raha results, something is wrong.')
+            detected_cells_index = relevant_result[0]['detected_cells_index']
+            detected_cells = {}
+
+            for pos in detected_cells_index:
+                detected_cells[tuple(pos)] = self.dataframe.iloc[pos[0], pos[1]]
+            return detected_cells
+        raise ValueError('invalid mode to get errors_dictionary.')
 
     def get_correction_dictionary(self):
         """

@@ -979,9 +979,9 @@ if __name__ == "__main__":
     # store results for detailed analysis
     dataset_analysis = True
 
-    dataset_name = "restaurant"
-    error_class = "simple_mcar"
-    error_fraction = 3
+    dataset_name = "cars"
+    error_class = "imputer_simple_mcar"
+    error_fraction = 1
     version = 1
     n_rows = None
 
@@ -1007,7 +1007,7 @@ if __name__ == "__main__":
 
     # Set this parameter to keep runtimes low when debugging
     data = dataset.Dataset(dataset_name, error_fraction, version, error_class, n_rows)
-    data.detected_cells = data.get_errors_dictionary()
+    data.detected_cells = data.get_errors_dictionary('raha')
 
     logging.info(f'Initialized dataset {dataset_name}')
 

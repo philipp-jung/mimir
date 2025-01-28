@@ -13,14 +13,24 @@ spec:
     image: debian
     name: tool
     volumeMounts:
+    - mountPath: /mimir-datasets
+      name: mimir-datasets-volume
     - mountPath: /garf-data
       name: data-volume
     - mountPath: /mirmir-data
       name: mirmir-results-volume
+    - mountPath: /raha-data
+      name: raha-results-volume
   volumes:
+  - name: mimir-datasets-volume
+    persistentVolumeClaim:
+      claimName: mimir-datasets-volume
   - name: data-volume
     persistentVolumeClaim:
       claimName: garf-measurements
   - name: mirmir-results-volume
     persistentVolumeClaim:
       claimName: mirmir-results-volume
+  - name: raha-results-volume
+    persistentVolumeClaim:
+      claimName: raha-results-volume
