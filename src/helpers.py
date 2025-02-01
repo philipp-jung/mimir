@@ -272,6 +272,7 @@ def insert_llm_into_cache(llm_result: LLMResult):
     """
     Add a record to the cache if it isn't in there already.
     """
+    version = llm_result.version if llm_result.dataset in mimir_dataset.RENUVER_DATASET_IDS else None
     conn = connect_to_cache()
     cursor = conn.cursor()
 
@@ -282,7 +283,7 @@ def insert_llm_into_cache(llm_result: LLMResult):
            WHERE dataset = ? AND row = ? AND column = ? AND
                  correction_model = ? AND error_fraction = ? AND
                  version = ? AND error_class = ? AND llm_name = ?""",
-        (llm_result.dataset, llm_result.row, llm_result.column, llm_result.correction_model_name, llm_result.error_fraction, llm_result.version, llm_result.error_class, llm_result.llm_name)
+        (llm_result.dataset, llm_result.row, llm_result.column, llm_result.correction_model_name, llm_result.error_fraction, version, llm_result.error_class, llm_result.llm_name)
     )
     existing_records = cursor.fetchone()[0]
     
