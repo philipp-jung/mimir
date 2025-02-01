@@ -7,6 +7,7 @@ import numpy as np
 from typing import Union, Dict, Tuple, List
 from dataclasses import dataclass
 from collections import defaultdict
+import dataset as mimir_dataset
 
 import openai
 import pandas as pd
@@ -190,7 +191,9 @@ def fetch_cache(dataset: str,
     else:
         query += " AND error_fraction IS NULL"
 
-    if version is not None:
+    # all dataset objects have a version to map a raha error mask to a run.
+    # however, datasets differ in version only when they are RENUVER datasets.
+    if dataset_name in mimir_dataset.RENUVER_DATASET_IDS:
         query += " AND version=?"
         parameters.append(version)
     else:

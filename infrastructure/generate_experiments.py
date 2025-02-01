@@ -37,9 +37,10 @@ def generate_job(config: dict, experiment_name: str, jobs_path: Path, id: int):
     Generates a kubernetes job config to run a mirmir experiment.
     """
 
-    memory = '64Gi'
-    if config['dataset'] in ['tax', 'food']:
-        memory = '500Gi'
+    # disable concurrency by selecting one node's resources
+    memory = '950Gi'
+    #if config['dataset'] in ['tax', 'food']:
+    #    memory = '500Gi'
 
     template = """apiVersion: batch/v1
 kind: Job 
@@ -52,6 +53,8 @@ spec:
       labels:
         app: {}
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: cl-worker34
       restartPolicy: Never
       tolerations:
         - key: nvidia.com/gpu

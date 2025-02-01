@@ -979,7 +979,7 @@ if __name__ == "__main__":
     # store results for detailed analysis
     dataset_analysis = True
 
-    dataset_name = "cars"
+    dataset_name = "beers"
     error_class = "imputer_simple_mcar"
     error_fraction = 1
     version = 1
