@@ -301,7 +301,7 @@ def insert_llm_into_cache(llm_result: LLMResult):
              json.dumps(llm_result.token_logprobs),
              json.dumps(llm_result.top_logprobs),
              llm_result.error_fraction,
-             llm_result.version,
+             version,
              llm_result.error_class,
              llm_result.llm_name)
         )
