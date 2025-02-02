@@ -122,9 +122,8 @@ def generate_train_test_data(column_errors: Dict[int, List[Tuple[int, int]]],
 
     for error_cell in column_errors[column]:
         correction_suggestions = pair_features.get(error_cell, [])
-        if error_cell in labeled_cells and labeled_cells[error_cell][0] == 1:
+        if error_cell in labeled_cells:
             # If an error-cell has been labeled by the user, use it to create the training dataset.
-            # The second condition is always true if error detection and user labeling work without an error.
             for suggestion in correction_suggestions:
                 x_train.append(pair_features[error_cell][suggestion])  # Puts features into x_train
                 suggestion_is_correction = (suggestion == labeled_cells[error_cell][1])

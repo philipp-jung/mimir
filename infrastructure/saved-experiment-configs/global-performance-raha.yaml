@@ -34,6 +34,7 @@ config_large:
   fd_feature: "norm_gpdep"
   sampling_technique: "greedy"
   detection_mode: "raha"
+  labeling_error_pct: 0
 
 
 ranges_baran:
@@ -71,6 +72,7 @@ config_baran:
   fd_feature: "norm_gpdep"
   sampling_technique: "greedy"
   detection_mode: "raha"
+  labeling_error_pct: 0
 
 
 ranges_gpt4:
@@ -106,6 +108,7 @@ config_gpt4:
   fd_feature: "norm_gpdep"
   sampling_technique: "greedy"
   detection_mode: "raha"
+  labeling_error_pct: 0
 
 
 ranges_renuver:
@@ -147,6 +150,7 @@ config_renuver:
   fd_feature: "norm_gpdep"
   sampling_technique: "greedy"
   detection_mode: "raha"
+  labeling_error_pct: 0
 
 ranges_openml:
   dataset:
@@ -187,5 +191,6 @@ config_openml:
   fd_feature: "norm_gpdep"
   sampling_technique: "greedy"
   detection_mode: "raha"
+  labeling_error_pct: 0
 
 runs: 3

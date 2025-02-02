@@ -62,7 +62,8 @@ class Cleaning:
                  fd_feature: str = 'norm_gpdep',
                  dataset_analysis: bool = False,
                  llm_name_corrfm: str = 'gpt-3.5-turbo',
-                 sampling_technique: str = 'baran'):
+                 sampling_technique: str = 'baran',
+                 labeling_error_pct: float = 0):
         """
         Parameters of the cleaning experiment.
         @param labeling_budget: How many tuples are labeled by the user. In the Baran publication, 20  labels are frequently used.
@@ -99,6 +100,7 @@ class Cleaning:
         @param dataset_analysis: Write a detailed analysis of how Mimir cleans a a dataset to a .json file.
         @param llm_name_corrfm: Name of the OpenAI LLM model used in et_corrfm.
         @param sampling_technique: Technique used to sample row for user input.
+        @param labeling_error_pct: Percentage of incorrectly labelled cells. Simulates defect user inputs.
         """
 
         self.SYNTH_TUPLES = synth_tuples
@@ -121,6 +123,7 @@ class Cleaning:
         self.MAX_VALUE_LENGTH = 50
         self.LABELING_BUDGET = labeling_budget
         self.LLM_NAME_CORRFM = llm_name_corrfm
+        self.LABELING_ERROR_PCT = labeling_error_pct
         self.logger = logging.getLogger(__name__)
 
         # TODO remove unused attributes
@@ -355,15 +358,34 @@ class Cleaning:
         in that row taken from the clean data, and then adds
         d.labeled_cells[(row, col)] = [is_error, clean_value_from_clean_dataframe]
         to d.labeled_cells.
+
+        Defective user inputs are simulated - with a chance of LABELING_ERROR_PCT,
+        another randomly chosen value of a column replaces the ground truth value.
         """
+        d.user_corrected_dataframe = d.dataframe.copy()
+        d.user_corrected_typed_dataframe = d.typed_dataframe.copy()
         d.labeled_tuples[sampled_tuple] = 1
         for col in range(d.dataframe.shape[1]):
             cell = (sampled_tuple, col)
+            ground_truth_value = d.clean_dataframe.iloc[cell]
+            typed_ground_truth_value = d.typed_clean_dataframe.iloc[cell]
             error_label = 0
-            if d.dataframe.iloc[cell] != d.clean_dataframe.iloc[cell]:
+            if d.dataframe.iloc[cell] != ground_truth_value:
                 error_label = 1
-            d.labeled_cells[cell] = [error_label, d.clean_dataframe.iloc[cell]]
-        self.logger.debug(f'Finished labeling tuple {sampled_tuple} with ground truth.')
+            
+            update_value = ground_truth_value
+            typed_update_value = typed_ground_truth_value
+            if random.random() < self.LABELING_ERROR_PCT:
+                user_error_candidates = d.clean_dataframe.loc[d.clean_dataframe.iloc[:, col] != ground_truth_value].iloc[:, col]
+                typed_user_error_candidates = d.typed_clean_dataframe.loc[d.typed_clean_dataframe.iloc[:, col] != typed_ground_truth_value].iloc[:, col]
+                if len(user_error_candidates) > 0:
+                    update_value = user_error_candidates.sample(n=1).iloc[0]
+                    typed_update_value = typed_user_error_candidates.sample(n=1).iloc[0]
+
+            d.labeled_cells[cell] = [error_label, update_value]
+            d.user_corrected_dataframe.iloc[cell] = update_value
+            d.user_corrected_typed_dataframe.iloc[cell] = typed_update_value
+        self.logger.debug(f'Finished labeling tuple {sampled_tuple}.')
 
     def update_models(self, d):
         """
@@ -396,7 +418,7 @@ class Cleaning:
                         # war, dass man einen Fehler labelt, der vorher noch nicht
                         # gelabelt war.
                         d.detected_cells[cell] = self.IGNORE_SIGN
-            logging.debug('Finish updating models.')
+        logging.debug('Finish updating models.')
 
     def _feature_generator_process(self, args):
         """
@@ -492,9 +514,9 @@ class Cleaning:
             self.logger.debug('Start FD profiling.')
             # calculate FDs
             inputted_rows = list(d.labeled_tuples.keys())
-            df_user_input = d.clean_dataframe.iloc[inputted_rows, :]  # careful, this is ground truth.
+            df_user_input = d.user_corrected_dataframe.iloc[inputted_rows, :]  # careful, this is ground truth.
             df_clean_iterative = pdep.cleanest_version(d.dataframe, df_user_input)
-            d.fds = pdep.mine_fds(df_clean_iterative, d.clean_dataframe)
+            d.fds = pdep.mine_fds(df_clean_iterative, d.user_corrected_dataframe)
             self.logger.debug('Profiled FDs.')
 
             # calculate gpdeps
@@ -538,7 +560,7 @@ class Cleaning:
             llm_master_results: List[helpers.LLMResult] = []
 
             inputted_rows = list(d.labeled_tuples.keys())
-            user_input = d.clean_dataframe.iloc[inputted_rows, :]
+            user_input = d.user_corrected_dataframe.iloc[inputted_rows, :]
             df_clean_subset = auto_instance.get_clean_table(d.dataframe, d.detected_cells, user_input)
             error_free_rows = df_clean_subset.shape[1]
             
@@ -612,7 +634,7 @@ class Cleaning:
 
             # Simulate user input by reading labeled data from the typed dataframe
             inputted_rows = list(d.labeled_tuples.keys())
-            typed_user_input = d.typed_clean_dataframe.iloc[inputted_rows, :]
+            typed_user_input = d.user_corrected_typed_dataframe.iloc[inputted_rows, :]
             df_clean_subset = auto_instance.get_clean_table(d.typed_dataframe, d.detected_cells, typed_user_input)
 
             # Model training is very expensive. Train models only for columns that contain errors.
@@ -979,7 +1001,7 @@ if __name__ == "__main__":
     # store results for detailed analysis
     dataset_analysis = True
 
-    dataset_name = "beers"
+    dataset_name = "rayyan"
     error_class = "imputer_simple_mcar"
     error_fraction = 1
     version = 1
@@ -988,7 +1010,7 @@ if __name__ == "__main__":
     labeling_budget = 20
     synth_tuples = 100
     synth_cleaning_threshold = 0.9
-    auto_instance_cache_model = True
+    auto_instance_cache_model = False
     clean_with_user_input = True  # Careful: If set to False, d.corrected_cells will remain empty.
     gpdep_threshold = 0.3
     training_time_limit = 90
@@ -1004,17 +1026,19 @@ if __name__ == "__main__":
     #llm_name_corrfm = "gpt-4-turbo"  # only use this for tax, because experiments get expensive :)
     llm_name_corrfm = "gpt-3.5-turbo"
     sampling_technique = 'greedy'
+    error_detection_mode = 'perfect'  # 'raha' for raha-detection results
+    labeling_error_pct = 0
 
     # Set this parameter to keep runtimes low when debugging
     data = dataset.Dataset(dataset_name, error_fraction, version, error_class, n_rows)
-    data.detected_cells = data.get_errors_dictionary('raha')
+    data.detected_cells = data.get_errors_dictionary(error_detection_mode)
 
     logging.info(f'Initialized dataset {dataset_name}')
 
     app = Cleaning(labeling_budget, classification_model, clean_with_user_input, feature_generators, vicinity_orders,
                      vicinity_feature_generator, auto_instance_cache_model, n_best_pdeps, training_time_limit,
                      synth_tuples, synth_cleaning_threshold, test_synth_data_direction, pdep_features, gpdep_threshold,
-                     fd_feature, dataset_analysis, llm_name_corrfm, sampling_technique)
+                     fd_feature, dataset_analysis, llm_name_corrfm, sampling_technique, labeling_error_pct)
     app.VERBOSE = True
     random_seed = 0
     correction_dictionary = app.run(data, random_seed, synchronous=False)

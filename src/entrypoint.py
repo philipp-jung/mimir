@@ -43,6 +43,7 @@ def run_mirmir(c: dict):
             False,
             c['llm_name_corrfm'],
             c['sampling_technique'],
+            c['labeling_error_pct']
         )
         app.VERBOSE = True
         seed = None

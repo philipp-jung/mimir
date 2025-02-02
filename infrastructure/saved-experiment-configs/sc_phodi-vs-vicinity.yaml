@@ -49,6 +49,7 @@ config_baran:
   fd_feature: "norm_gpdep"
   sampling_technique: "greedy"
   detection_mode: "perfect"
+  labeling_error_pct: 0
 
 
 ranges_renuver:
@@ -101,6 +102,7 @@ config_renuver:
   fd_feature: "norm_gpdep"
   sampling_technique: "greedy"
   detection_mode: "perfect"
+  labeling_error_pct: 0
 
 
 ranges_openml:
@@ -153,5 +155,6 @@ config_openml:
   fd_feature: "norm_gpdep"
   sampling_technique: "greedy"
   detection_mode: "perfect"
+  labeling_error_pct: 0
 
 runs: 3
