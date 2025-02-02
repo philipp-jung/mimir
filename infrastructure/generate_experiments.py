@@ -39,6 +39,7 @@ def generate_job(config: dict, experiment_name: str, jobs_path: Path, id: int):
 
     # disable concurrency by selecting one node's resources
     memory = '950Gi'
+    #memory = '64Gi'
     #if config['dataset'] in ['tax', 'food']:
     #    memory = '500Gi'
 

@@ -3,7 +3,7 @@ experiment_name: 2025-01-26-global-performance-raha
 ranges_large:
   dataset:
     - tax
-    - food
+      #- food  # food is detected by raha with f-score of 0.00
 
 config_large:
   dataset: "1481"
