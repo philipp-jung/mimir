@@ -1001,9 +1001,9 @@ if __name__ == "__main__":
     # store results for detailed analysis
     dataset_analysis = True
 
-    dataset_name = "rayyan"
+    dataset_name = "bridges"
     error_class = "imputer_simple_mcar"
-    error_fraction = 1
+    error_fraction = 3
     version = 1
     n_rows = None
 
@@ -1027,9 +1027,8 @@ if __name__ == "__main__":
     llm_name_corrfm = "gpt-3.5-turbo"
     sampling_technique = 'greedy'
     error_detection_mode = 'perfect'  # 'raha' for raha-detection results
-    labeling_error_pct = 0
+    labeling_error_pct = 1
 
-    # Set this parameter to keep runtimes low when debugging
     data = dataset.Dataset(dataset_name, error_fraction, version, error_class, n_rows)
     data.detected_cells = data.get_errors_dictionary(error_detection_mode)
 

@@ -41,3 +41,7 @@ These are simply called `{dataset_name}_dirty.csv`
 
 Holoclean expects the ground truth in a funky format, with the first column being the row number (int), the second column being the attribute name (str), and the third column being the value.
 The ground truth files are converted accordingly by `export_holoclean_input.py`.
+
+## Baranpp
+Baranpp is an implementation of Mimir's correctors in the Baran cleaning system.
+The source code can be found [on github](https://github.com/philipp-jung/baranpp/tree/main).
