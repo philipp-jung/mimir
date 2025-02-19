@@ -1001,11 +1001,12 @@ if __name__ == "__main__":
     # store results for detailed analysis
     dataset_analysis = True
 
-    dataset_name = "bridges"
+    dataset_name = "ncvoters"
     error_class = "imputer_simple_mcar"
     error_fraction = 3
     version = 1
-    n_rows = None
+    n_rows = 1000
+    n_cols = None
 
     labeling_budget = 20
     synth_tuples = 100
@@ -1027,9 +1028,9 @@ if __name__ == "__main__":
     llm_name_corrfm = "gpt-3.5-turbo"
     sampling_technique = 'greedy'
     error_detection_mode = 'perfect'  # 'raha' for raha-detection results
-    labeling_error_pct = 1
+    labeling_error_pct = 0
 
-    data = dataset.Dataset(dataset_name, error_fraction, version, error_class, n_rows)
+    data = dataset.Dataset(dataset_name, error_fraction, version, error_class, n_rows, n_cols)
     data.detected_cells = data.get_errors_dictionary(error_detection_mode)
 
     logging.info(f'Initialized dataset {dataset_name}')

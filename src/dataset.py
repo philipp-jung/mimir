@@ -7,7 +7,7 @@ import pandas as pd
 OPENML_DATSET_IDS = ["725", "310", "1046", "823", "137", "42493", "4135", "251", "151", "40922", "40498", "30", "1459", "1481", "184", "375", "32", "41027", "6", "40685", "43572"]
 HPI_DATASET_IDS = ["cddb"]
 RENUVER_DATASET_IDS = ["bridges", "cars", "glass", "restaurant"]
-BARAN_DATASET_IDS = ["beers", "flights", "hospital", "tax", "rayyan", "toy", "debug", "synth-debug", "food"]
+BARAN_DATASET_IDS = ["beers", "flights", "hospital", "tax", "rayyan", "toy", "debug", "synth-debug", "food", "ncvoters"]
 UCI_DATASET_IDS = ["adult", "breast-cancer", "letter", "nursery"]
 
 
@@ -21,7 +21,8 @@ class Dataset:
                  error_fraction: Union[None, int] = None,
                  version: Union[None, int] = None,
                  error_class: Union[None, str] = None,
-                 n_rows: Union[None, int] = None):
+                 n_rows: Union[None, int] = None,
+                 n_cols: Union[None, int] = None):
         """
         I currently use four different sources of datasets: the original Baran paper, the RENUVER paper, datasets that
         I assemble from OpenML, and hand-selected datasets from the UCI website. Depending on the source, the datasets
@@ -41,6 +42,7 @@ class Dataset:
         versions to avoid outlier corruptions.
         @param error_class: Strategy according to which an error has been created. Only applies to OpenML datasets.
         @param n_rows: If n_rows is specified, the dataset gets subsetted to the first n_rows rows.
+        @param n_cols: If n_cols is specified, the dataset gets subsetted to the first n_cols rows.
         """
         self.repaired_dataframe = None  # to be assigned after cleaning suggestions were applied.
         self.error_fraction = None
@@ -123,6 +125,12 @@ class Dataset:
             self.clean_dataframe = self.clean_dataframe.iloc[:n_rows, :]
             self.typed_dataframe = self.typed_dataframe.iloc[:n_rows, :]
             self.typed_clean_dataframe = self.typed_clean_dataframe.iloc[:n_rows, :]
+        
+        if n_cols is not None:
+            self.dataframe = self.dataframe.iloc[:, :n_cols]
+            self.clean_dataframe = self.clean_dataframe.iloc[:, :n_cols]
+            self.typed_dataframe = self.typed_dataframe.iloc[:, :n_cols]
+            self.typed_clean_dataframe = self.typed_clean_dataframe.iloc[:, :n_cols]
 
 
     @staticmethod
