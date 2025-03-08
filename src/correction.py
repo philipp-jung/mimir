@@ -499,7 +499,7 @@ class Cleaning:
         2) Train auto_instance model for each column.
         """
 
-        n_workers = min(multiprocessing.cpu_count() - 1, 24)
+        n_workers = multiprocessing.cpu_count() - 1
         shape = d.dataframe.shape
         error_positions = helpers.ErrorPositions(d.detected_cells, shape, d.labeled_cells)
         row_errors = error_positions.updated_row_errors()
@@ -669,7 +669,7 @@ class Cleaning:
         Use correctors to generate correction features.
         """
         process_args_list = [[d, cell, False] for cell in d.detected_cells]
-        n_workers = min(multiprocessing.cpu_count() - 1, 24)
+        n_workers = multiprocessing.cpu_count() - 1
 
         self.logger.debug('Start user feature generation of Mimir Correctors.')
 
@@ -773,7 +773,7 @@ class Cleaning:
         error positions, carefully avoiding additional training data that contains known errors.
         """
         synth_args_list = []
-        n_workers = min(multiprocessing.cpu_count() - 1, 16)
+        n_workers = multiprocessing.cpu_count()
 
         if self.SYNTH_TUPLES > 0 and len(d.synthetic_error_cells) > 0:
             synth_args_list = [[d, cell, True] for cell in d.synthetic_error_cells]
@@ -999,14 +999,14 @@ class Cleaning:
 
 if __name__ == "__main__":
     # store results for detailed analysis
-    dataset_analysis = True
+    dataset_analysis = False
 
     dataset_name = "ncvoters"
     error_class = "imputer_simple_mcar"
-    error_fraction = 3
+    error_fraction = 1
     version = 1
     n_rows = 1000
-    n_cols = None
+    n_cols = 19
 
     labeling_budget = 20
     synth_tuples = 100

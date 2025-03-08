@@ -1,0 +1,1 @@
+{"status": 1, "result": {"precision": 0.7410341672431877, "recall": 0.5434533551554828, "f1": 0.6270477485388399, "runtime": 5724.03044462204}, "config": {"task": "correction", "dataset": "tax", "n_rows": 100000, "error_fraction": 1, "error_class": "simple_mcar", "error_detection_mode": "raha", "run": 2}}

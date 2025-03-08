@@ -1,0 +1,1 @@
+{"status": 1, "result": {"precision": 0.03407601572739188, "recall": 0.03407601572739188, "f1": 0.03407601572739188}, "config": {"dataset": "cars", "error_fraction": 1, "version": 2, "error_class": "imputer_simple_mcar", "n_rows": null, "n_cols": null}}

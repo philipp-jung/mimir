@@ -1,0 +1,1 @@
+{"n_errors": 90, "dataset": "glass", "error_fraction": 1, "version": 2, "error_class": "imputer_simple_mcar", "n_rows": null, "n_cols": null}

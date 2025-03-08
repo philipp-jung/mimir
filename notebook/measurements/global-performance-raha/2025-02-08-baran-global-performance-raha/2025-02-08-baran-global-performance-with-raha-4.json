@@ -1,0 +1,1 @@
+{"status": 0, "result": "division by zero", "config": {"task": "correction", "dataset": "food", "n_rows": 50000, "error_fraction": 1, "error_class": "simple_mcar", "error_detection_mode": "raha", "run": 1}}

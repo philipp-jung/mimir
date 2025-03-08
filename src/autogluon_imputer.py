@@ -106,7 +106,7 @@ class AutoGluonImputer():
             feature_generator=feature_generator,
             calibrate=True,
             verbosity=self.verbosity,
-            num_cpus=25)  # funny: num_cpus expects a string, and if you pass a string, AG crashes.
+            )  # funny: num_cpus expects a string, and if you pass a string, AG crashes.
 
         return self
 

@@ -1,0 +1,1 @@
+{"detected_cells_index": [[6, 3], [72, 3], [97, 3], [98, 3], [107, 3], [29, 4], [20, 6], [32, 6], [44, 6], [45, 6], [54, 6], [57, 6], [64, 6], [75, 6], [98, 6], [104, 6]], "precision": 0.5, "recall": 0.5714285714285714, "f1": 0.5333333333333333, "dataset_name": "bridges", "error_class": "simple_mcar", "error_fraction": 1, "version": 3}

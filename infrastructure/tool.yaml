@@ -21,6 +21,10 @@ spec:
       name: mirmir-results-volume
     - mountPath: /raha-data
       name: raha-results-volume
+    - mountPath: /domino-datasets
+      name: domino-datasets-volume
+    - mountPath: /renuver-datasets
+      name: renuver-datasets-volume
   volumes:
   - name: mimir-datasets-volume
     persistentVolumeClaim:
@@ -34,3 +38,9 @@ spec:
   - name: raha-results-volume
     persistentVolumeClaim:
       claimName: raha-results-volume
+  - name: domino-datasets-volume
+    persistentVolumeClaim:
+      claimName: domino-datasets-volume
+  - name: renuver-datasets-volume
+    persistentVolumeClaim:
+      claimName: renuver-datasets-volume

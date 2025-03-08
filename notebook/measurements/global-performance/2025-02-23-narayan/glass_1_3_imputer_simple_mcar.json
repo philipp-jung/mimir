@@ -1,0 +1,1 @@
+{"status": 1, "result": {"precision": 0.0, "recall": 0.0, "f1": 0.0}, "config": {"dataset": "glass", "error_fraction": 1, "version": 3, "error_class": "imputer_simple_mcar", "n_rows": null, "n_cols": null}}

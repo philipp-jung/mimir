@@ -1,0 +1,1 @@
+{"n_errors": 50, "dataset": "184", "error_fraction": 5, "version": 1, "error_class": "imputer_simple_mcar", "n_rows": 1000, "n_cols": null}

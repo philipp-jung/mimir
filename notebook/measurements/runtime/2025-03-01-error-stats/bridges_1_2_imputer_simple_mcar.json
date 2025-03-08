@@ -1,0 +1,1 @@
+{"n_errors": 14, "dataset": "bridges", "error_fraction": 1, "version": 2, "error_class": "imputer_simple_mcar", "n_rows": null, "n_cols": null}

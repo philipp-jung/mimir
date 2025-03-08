@@ -1,0 +1,1 @@
+{"status": 1, "result": {"precision": 0.25, "recall": 0.25, "f1": 0.25}, "config": {"dataset": "restaurant", "error_fraction": 1, "version": 1, "error_class": "imputer_simple_mcar", "n_rows": null, "n_cols": null}}

@@ -1,0 +1,1 @@
+{"dataset": "restaurant", "error_fraction": 1, "error_class": "imputer_simple_mcar", "run": 1, "ed_p": 1.0, "ed_r": 1.0, "ed_f": 1.0, "ec_p": 0.11538461538461539, "ec_r": 0.11538461538461539, "ec_f": 0.11538461538461539}

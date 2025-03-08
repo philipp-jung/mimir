@@ -40,14 +40,15 @@ def generate_job(config: dict, experiment_name: str, jobs_path: Path, id: int):
     # disable concurrency by selecting one node's resources
     memory = '950Gi'
     #memory = '64Gi'
-    #if config['dataset'] in ['tax', 'food']:
-    #    memory = '500Gi'
+    # if config['dataset'] in ['tax', 'food']:
+    #     memory = '500Gi'
 
     template = """apiVersion: batch/v1
 kind: Job 
 metadata:
   name: {}
 spec:
+  ttlSecondsAfterFinished: 30  # Delete pod 30s after job finishes to free up disk space
   completions: 1
   template:
     metadata:
@@ -63,8 +64,11 @@ spec:
           effect: NoSchedule
       containers:
         - name: mimir
-          image: docker.io/larmor27/mimir:latest
+          image: larmor27/mimir:latest
+          imagePullPolicy: Always
           env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -76,11 +80,11 @@ spec:
               value: {}
           volumeMounts:
             - name: mimir-datasets-volume
-              mountPath: /datasets  # Mounting the PVC at /app/output directory in the container
+              mountPath: /datasets  # Mounting the PVC at /app/datasets directory in the container
             - name: mirmir-results-volume
-              mountPath: /measurements  # Mounting the PVC at /app/output directory in the container
+              mountPath: /measurements  # Mounting the PVC at /app/measurements directory in the container
             - name: ag-models-volume
-              mountPath: /agModels  # Mounting the ephemeral volume at /agModels directory in the container
+              mountPath: /src/agModels  # Mounting at /app/src/agModels directory
           resources:
             requests:
               # only start on nodes with 64Gi of RAM available 
@@ -91,7 +95,8 @@ spec:
               # kill the pod when it uses more than 64Gi of RAM
               memory: "{}"  
               # restrict the pod to never use more than 26 full CPU cores
-              cpu: 26
+              # removing this now because I also lifted the cpu-limit on autogluon
+              #cpu: 26
       volumes:
         - name: mimir-datasets-volume
           persistentVolumeClaim:

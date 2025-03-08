@@ -1,0 +1,1 @@
+{"detected_cells_index": [[113, 5], [259, 5], [305, 5], [312, 5], [325, 5], [396, 5], [467, 5], [515, 5], [662, 5], [669, 5], [836, 5]], "precision": 1.0, "recall": 0.21153846153846154, "f1": 0.34920634920634924, "dataset_name": "restaurant", "error_class": "simple_mcar", "error_fraction": 1, "version": 3}

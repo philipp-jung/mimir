@@ -7,8 +7,8 @@ import pandas as pd
 OPENML_DATSET_IDS = ["725", "310", "1046", "823", "137", "42493", "4135", "251", "151", "40922", "40498", "30", "1459", "1481", "184", "375", "32", "41027", "6", "40685", "43572"]
 HPI_DATASET_IDS = ["cddb"]
 RENUVER_DATASET_IDS = ["bridges", "cars", "glass", "restaurant"]
-BARAN_DATASET_IDS = ["beers", "flights", "hospital", "tax", "rayyan", "toy", "debug", "synth-debug", "food", "ncvoters"]
-UCI_DATASET_IDS = ["adult", "breast-cancer", "letter", "nursery"]
+BARAN_DATASET_IDS = ["beers", "flights", "hospital", "tax", "rayyan", "toy", "debug", "synth-debug", "food"]
+UCI_DATASET_IDS = ["adult", "breast-cancer", "letter", "nursery", "ncvoters"]
 
 
 class Dataset:
@@ -96,9 +96,9 @@ class Dataset:
 
         elif dataset_name in UCI_DATASET_IDS:
             self.path = f"../datasets/{dataset_name}/MCAR/dirty_{error_fraction}.csv"
+            self.parquet_path = f"../datasets/{dataset_name}/MCAR/dirty_{error_fraction}.parquet"
             self.clean_path = f"../datasets/{dataset_name}/clean.csv"
-            self.parquet_path = self.path  # no parquet file is available.
-            self.typed_clean_path = self.clean_path  # no parquet file is available.
+            self.typed_clean_path = os.path.splitext(self.clean_path)[0] + '.parquet'
 
             self.name = dataset_name
             self.error_fraction = error_fraction
@@ -275,6 +275,67 @@ class Dataset:
 
 ########################################
 if __name__ == "__main__":
-    d = Dataset('toy')
-    print(d.get_data_quality())
+    print('Start storing data quality results.')
+    baran_dataset_ids = ["beers", "flights", "hospital", "rayyan", "tax", "food"]
+    renuver_dataset_ids = ["bridges", "cars", "glass", "restaurant"]
+    openml_dataset_ids = ["6", "137", "151", "184", "1481", "41027", "43572"]
+
+    results_path = 'measurements/'
+    for dataset_name in openml_dataset_ids:
+        for error_class in ['imputer_simple_mcar']:
+            error_fraction = 5
+            version = 1
+
+            config = {'dataset': dataset_name,
+                      'error_fraction': error_fraction,
+                      'version': version,
+                      'error_class': error_class,
+                      'n_rows': 1000,
+                      'n_cols': None}
+            experiment_id = f"nerrors_{dataset_name}_{error_fraction}_{version}_{error_class}"
+
+            data = Dataset(dataset_name, error_fraction, version, error_class, 1000, None)
+            error_dict = data.get_errors_dictionary('perfect')
+
+            result = {'n_errors': len(error_dict), **config}
+            with open(Path(results_path) / f"{experiment_id}.json", 'wt') as f:
+                json.dump(result, f)
+
+    three_runs = range(1, 4)
+
+    for dataset_name in renuver_dataset_ids:
+        for version in three_runs:
+            for error_fraction in [1, 3]:
+                error_class = 'imputer_simple_mcar'
+                config = {'dataset': dataset_name,
+                          'error_fraction': error_fraction,
+                          'version': version,
+                          'error_class': error_class,
+                          'n_rows': None,
+                          'n_cols': None}
+                data = Dataset(dataset_name, error_fraction, version, error_class, 1000, None)
+                error_dict = data.get_errors_dictionary('perfect')
+
+                experiment_id = f"{dataset_name}_{error_fraction}_{version}_{error_class}"
+                result = {'n_errors': len(error_dict), **config}
+                with open(Path(results_path) / f"{experiment_id}.json", 'wt') as f:
+                    json.dump(result, f)
+
+    for dataset_name in baran_dataset_ids:
+        error_fraction = 1
+        version = 1
+        error_class = 'imputer_simple_mcar'
+        config = {'dataset': dataset_name,
+                    'error_fraction': error_fraction,
+                    'version': version,
+                    'error_class': error_class,
+                    'n_rows': None,
+                    'n_cols': None}
+        data = Dataset(dataset_name, error_fraction, version, error_class, 1000, None)
+        error_dict = data.get_errors_dictionary('perfect')
+
+        experiment_id = f"{dataset_name}_{error_fraction}_{version}_{error_class}"
+        result = {'n_errors': len(error_dict), **config}
+        with open(Path(results_path) / f"{experiment_id}.json", 'wt') as f:
+            json.dump(result, f)
 ########################################

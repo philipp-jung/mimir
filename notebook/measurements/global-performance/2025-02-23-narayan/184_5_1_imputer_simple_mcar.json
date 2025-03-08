@@ -1,0 +1,1 @@
+{"status": 1, "result": {"precision": 0.96, "recall": 0.96, "f1": 0.96}, "config": {"dataset": "184", "error_fraction": 5, "version": 1, "error_class": "imputer_simple_mcar", "n_rows": null, "n_cols": null}}

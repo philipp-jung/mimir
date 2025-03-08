@@ -1,0 +1,1 @@
+{"n_errors": 7, "dataset": "food", "error_fraction": 1, "version": 1, "error_class": "imputer_simple_mcar", "n_rows": null, "n_cols": null}
