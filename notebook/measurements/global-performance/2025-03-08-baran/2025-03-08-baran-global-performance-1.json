@@ -1,1 +1,0 @@
-{"status": 1, "result": {"precision": 0.38344226579520696, "recall": 0.2724458204334365, "f1": 0.318552036199095, "runtime": 906.8183164596558}, "config": {"task": "correction", "dataset": "food", "n_rows": null, "error_fraction": 1, "error_class": "simple_mcar", "error_detection_mode": "perfect", "labeling_error_pct": 0, "run": 1}}

@@ -1,1 +1,0 @@
-{"status": 1, "result": {"precision": 0.8571428571428571, "recall": 0.8571428571428571, "f1": 0.8571428571428571, "runtime": 532.9891231060028}, "config": {"task": "correction", "dataset": "bridges", "n_rows": null, "error_fraction": 1, "error_class": "simple_mcar", "error_detection_mode": "perfect", "labeling_error_pct": 0, "run": 1}}

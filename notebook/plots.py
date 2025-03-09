@@ -1311,6 +1311,21 @@ def new_plot_runtime(mimir_result_dir: str, baran_result_dir: str, baranpp_resul
                          .agg({'runtime': 'mean'})
                          .reset_index()
                          )
+    df_mimir_runtimes.columns = ['normalized_dataset', 'mimir']
+
+    df_baran_runtimes = (pd.DataFrame(res_baran_runtime)
+                         .loc[:, ['normalized_dataset', 'runtime']]
+                         .groupby(['normalized_dataset'])
+                         .agg({'runtime': 'mean'})
+                         .reset_index())
+    df_baran_runtimes.columns = ['normalized_dataset', 'baran']
+
+    df_baranpp_runtimes = (pd.DataFrame(res_baranpp_runtime)
+                         .loc[:, ['normalized_dataset', 'runtime']]
+                         .groupby(['normalized_dataset'])
+                         .agg({'runtime': 'mean'})
+                         .reset_index())
+    df_baranpp_runtimes.columns = ['normalized_dataset', 'baranpp']
 
     ax.scatter([r['runtime'] for r in res_mimir_runtime], [r['normalized_dataset'] for r in res_mimir_runtime], label='Mimir', marker='*')
     ax.scatter([r['runtime'] for r in res_baran_runtime], [r['normalized_dataset'] for r in res_baran_runtime], label='Baran', marker='.')
@@ -1349,14 +1364,18 @@ def new_plot_runtime(mimir_result_dir: str, baran_result_dir: str, baranpp_resul
                          .agg({'n_errors': 'first'})
                          .reset_index()
                          )
-    joined_df = pd.merge(df_error_stats, df_mimir_runtimes, on='normalized_dataset', how='inner') # or how='left', 'right', 'outer' as needed
-    joined_df['runtime_per_error'] = round(joined_df['runtime'] / joined_df['n_errors'], 2)
+    joined_df = pd.merge(df_error_stats, df_mimir_runtimes, on='normalized_dataset', how='left') # or how='left', 'right', 'outer' as needed
+    joined_df = pd.merge(joined_df, df_baran_runtimes, on='normalized_dataset', how='left')
+    joined_df = pd.merge(joined_df, df_baranpp_runtimes, on='normalized_dataset', how='left')
+    joined_df['baran_per_error'] = round(joined_df['baran'] / joined_df['n_errors'], 2)
+    joined_df['mimir_per_error'] = round(joined_df['mimir'] / joined_df['n_errors'], 2)
+    joined_df['baranpp_per_error'] = round(joined_df['baranpp'] / joined_df['n_errors'], 2)
 
     for r in joined_df.itertuples():
         ax.text(
             x=text_x_pos,  # Position text slightly to the right
             y=r.normalized_dataset,
-            s=str(r.runtime_per_error),
+            s=str(r.mimir_per_error),
             fontsize=REST_FONTSIZE,
             va='center',
             ha='left',
