@@ -1,0 +1,1 @@
+{"status": 1, "result": {"precision": 0.005535435864014717, "recall": 0.005535435864014717, "f1": 0.005535435864014717}, "config": {"dataset": "tax", "error_fraction": 1, "version": 1, "error_class": "imputer_simple_mcar", "n_rows": null, "n_cols": null}}

@@ -1,10 +1,11 @@
+import numpy as np
 from pathlib import Path, PosixPath
 import pandas as pd
 import json
 from matplotlib import pyplot as plt
 import matplotlib.patches as mpatches
 import matplotlib.gridspec as gridspec
-from matplotlib.ticker import MultipleLocator
+from matplotlib.ticker import MultipleLocator, ScalarFormatter
 import seaborn as sns
 from typing import List, Tuple, Dict
 import warnings
@@ -122,7 +123,10 @@ def set_size(width, fraction=1):
     return fig_dim
 
 COLUMNWIDTH_PT = 238.96417
-FIGURE_HEIGHT, FIGURE_WIDTH = set_size(COLUMNWIDTH_PT)
+TEXTWIDTH_PT = 495.0
+FIGURE_WIDTH, FIGURE_HEIGHT = set_size(COLUMNWIDTH_PT)
+FULL_FIGURE_WIDTH, FULL_FIGURE_HEIGHT = set_size(TEXTWIDTH_PT)
+
 
 
 def load_result(path_to_result: str):
@@ -343,7 +347,7 @@ def plot_global_ablation_study(ablation_study_dir: str) -> Tuple[plt.figure, Tup
     sub_pivot_df1 = pivot_df[ABLATION_COLUMN_ORDER_1]
 
     # Create a figure and two sub-plots
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(FIGURE_WIDTH*2, FIGURE_HEIGHT*2), sharey=True)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(FIGURE_HEIGHT*2, FIGURE_WIDTH*2), sharey=True)
 
     # Plot the first sub-plot
     sub_pivot_df1.plot(kind='barh', ax=ax1, color=[MIMIR_LABEL_COLORS[label] for label in sub_pivot_df1.columns], legend=False, width=0.65)
@@ -384,7 +388,7 @@ def ablation_scatter(mimir_ablation_path: str) -> Tuple[plt.figure, plt.axes, Li
     pivot_df = df.pivot(index='normal_dataset', columns='feature_generators', values='f1')
 
     # Plotting with Seaborn
-    fig, ax = plt.subplots(nrows=1, ncols=1, constrained_layout=True, figsize=(2*FIGURE_WIDTH, 2*FIGURE_HEIGHT))
+    fig, ax = plt.subplots(nrows=1, ncols=1, constrained_layout=True, figsize=(2*FIGURE_HEIGHT, 2*FIGURE_WIDTH))
 
     # Plotting other models
     for col in pivot_df.columns:
@@ -436,7 +440,7 @@ def plot_ablation(ablation_study_dir: str, corrector: str, subset=True):
     df = df.reindex(index=DATASETS_ORDER)
 
     # Create a figure and two sub-plots
-    fig, ax = plt.subplots(1, 1, figsize=(FIGURE_WIDTH*1.5, FIGURE_HEIGHT*1.5))
+    fig, ax = plt.subplots(1, 1, figsize=(FIGURE_HEIGHT*1.5, FIGURE_WIDTH*1.5))
 
     df.plot(kind='barh', ax=ax, rot=0, color=[MIMIR_LABEL_COLORS[label] for label in df.columns], legend=False, width=.75)
     ax.set_ylabel('Dataset', labelpad=0, fontsize=ACHSEN_FONTSIZE)
@@ -745,79 +749,6 @@ def plot_joint_ablation(ablation_study_dir: str, baranpp_global_performance_dir:
 
     return fig, (ax0, ax1, ax3), failed_measurements, pivot_df
 
-def plot_local_ablation_study(ablation_study_dir: str) -> Tuple[plt.figure, Tuple[plt.axes, plt.axes], List]:
-    """
-    Local ablation study to showcase corrector's properties.
-    """
-    df_global, failed_measurements = get_ablation_study(ablation_study_dir)
-    df_global = df_global.groupby(['dataset', 'feature_generators', 'error_fraction', 'error_class']).agg({'f1': 'mean',
-                                                                                        'precision': 'mean',
-                                                                                        'recall': 'mean',
-                                                                                        'run': list}).reset_index()
-    df_global['normal_dataset'] = df_global.apply(normalize_dataset, axis=1)
-
-    # get relevant datasets
-    df = df_global[df_global['normal_dataset'].isin(['flights', 'beers', '151 \n cat 5%', '43572 \n cat 5%'])]
-
-    pivot_df = df.pivot(index='normal_dataset', columns='feature_generators', values='f1')
-
-    # Reorder the columns of the pivot_df dataframe for the first sub-plot
-    sub_pivot_df1 = pivot_df[ABLATION_COLUMN_ORDER_1]
-
-    # Create a figure and two sub-plots
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(FIGURE_WIDTH*2, FIGURE_HEIGHT), sharey=True,)
-
-    # Plot the first sub-plot
-    sub_pivot_df1.plot(kind='barh', ax=ax1, rot=0, color=[MIMIR_LABEL_COLORS[label] for label in sub_pivot_df1.columns], legend=False, width=0.75)
-    ax1.set_ylabel('Dataset', labelpad=4, fontsize=ACHSEN_FONTSIZE)
-    ax1.set_xlabel('$F_1$ score', labelpad=-8, fontsize=ACHSEN_FONTSIZE)
-    ax1.set_title('Drop One Corrector')
-    ax1.spines['top'].set_visible(False)
-    ax1.spines['right'].set_visible(False)
-
-    ax1.set_xticks([0.0, 1.0])  # Set x-axis ticks
-
-    # Remove ticks from the y-axis
-    ax1.tick_params(axis='y', which='both', left=False, labelleft=True, pad=0, labelsize=ACHSEN_FONTSIZE)
-
-    for i, b in enumerate(ax1.patches):
-        b.set_hatch(PATTERN_PALETTE[i//4])
-        #b.set_rasterized(True)
-        b.set_edgecolor("black")
-        
-    # Reorder the columns of the pivot_df dataframe for the second sub-plot
-    sub_pivot_df2 = pivot_df[ABLATION_COLUMN_ORDER_2]
-
-    # Plot the second sub-plot
-    sub_pivot_df2.plot(kind='barh', ax=ax2, rot=0, color=[MIMIR_LABEL_COLORS[label] for label in sub_pivot_df2.columns], legend=False, width=0.75)
-    ax2.set_xlabel('$F_1$ score', labelpad=-8, fontsize=ACHSEN_FONTSIZE)
-    ax2.set_title('Select One Corrector')
-    ax2.spines['top'].set_visible(False)
-    ax2.spines['right'].set_visible(False)
-
-    ax2.set_xticks([0.0, 1.0])  # Set x-axis ticks
-
-    # Remove ticks from the y-axis
-    ax2.tick_params(axis='y', which='both', left=False, labelleft=False)
-
-    for i, b in enumerate(ax2.patches):
-        b.set_hatch(PATTERN_PALETTE[i//4])
-        #b.set_rasterized(True)
-        b.set_edgecolor("black")
-
-    # Create custom handles for the legend
-    custom_handles = [mpatches.Patch(facecolor=MIMIR_LABEL_COLORS[key], 
-                                    label=ABLATION_BAR_CUSTOM_LABELS[key], 
-                                    hatch=list(reversed(PATTERN_PALETTE))[i], 
-                                    #rasterized=True,
-                                    edgecolor='black') for i, key in enumerate(ABLATION_BAR_CUSTOM_LABELS)]
-
-    fig.legend(custom_handles, ABLATION_BAR_CUSTOM_LABELS.values(), title='Correctors', 
-            title_fontsize=ACHSEN_FONTSIZE, loc='lower center', fontsize=REST_FONTSIZE,
-            bbox_to_anchor=(0.5, -0.25, 0, 0), ncol=len(ABLATION_BAR_CUSTOM_LABELS)//2, frameon=False)
-
-    return fig, (ax1, ax2), failed_measurements 
-
 def get_baran_experiment(baran_results_path: str, baran_experiment_name: str) -> List[dict]:
     """
     Global performance of Baran on all datasets.
@@ -839,6 +770,26 @@ def get_baran_experiment(baran_results_path: str, baran_experiment_name: str) ->
     # normalize dataset names
     res_baran = [{**r, 'normalized_dataset': normalize_dataset(r)} for r in res_baran]
     return res_baran
+
+def get_raha_result(raha_results_path: str) -> List[dict]:
+    res_raha = []
+    pathlist = Path(raha_results_path).glob('*.json')
+    for path in pathlist:
+        with open(path) as f:
+            res_raha.append(json.load(f))
+
+    print(f'Loaded {len(res_raha)} Raha Results.')
+    res_raha = [{("dataset" if k == "dataset_name" else k): v for k, v in d.items()} for d in res_raha]
+    res_raha = [{k: v for k, v in d.items() if k != 'detected_cells_index'} for d in res_raha]  # filter out detection result
+    res_raha = [{**r, 'ensemble': 'Raha', 'dataset_group': get_dataset_group(r['dataset'])} for r in res_raha]
+    res_raha = [{**r, 'normalized_dataset': normalize_dataset(r)} for r in res_raha]
+
+    # Filter out 1pct OpenML because they're always perfectly cleaned
+    res_raha = [r for r in res_raha if not (r['dataset_group'] == 'OpenML' and r['error_fraction'] == 1)]
+    # Filter out non-categorical OpenML
+    res_raha = [r for r in res_raha if not (r['dataset_group'] == 'OpenML' and 'simple_mcar' == r['error_class'])]
+
+    return res_raha
 
 def get_mimir_result(mimir_results_path: str) -> Tuple[List[dict], List]:
     res_mimir = []
@@ -881,6 +832,49 @@ def get_holoclean_global_performance(holoclean_results_path: str):
     hc_results = [r for r in hc_results if not (r['dataset_group'] == "Renuver" and str(r['error_fraction']) in ['2', '4', '5'])]
     return hc_results
 
+def get_renuver_result(renuver_results_path: str):
+    renuver_results = []
+    results_dir = Path(renuver_results_path)
+    pathlist = Path(results_dir).glob('*.json')
+    for path in pathlist:
+        with open(path) as f:
+            measurement = json.load(f)
+            renuver_results.append(measurement)
+
+    renuver_results = [{'normalized_dataset': normalize_dataset(r),
+                        'ensemble': 'RENUVER',
+                        'ed_p': r.get('ed_p'),
+                        'ed_r': r.get('ed_r'),
+                        'ed_f': r.get('ed_f'),
+                        'precision': r.get('ec_p'),
+                        'recall': r.get('ec_r'),
+                        'f1': r.get('ec_f'),
+                        'error_class': r.get('error_class'),
+                        'dataset_group': get_dataset_group(r['dataset']),
+                        'error_fraction': r.get('error_fraction')
+    } for r in renuver_results]
+
+    return renuver_results
+
+def get_narayan_result(narayan_result_path: str):
+    narayan_results = []
+    results_dir = Path(narayan_result_path)
+    pathlist = Path(results_dir).glob('*.json')
+    for path in pathlist:
+        with open(path) as f:
+            measurement = json.load(f)
+            narayan_results.append(measurement)
+
+    res_narayan = [{**m['config'],
+                  **m['result'],
+                  'ensemble': 'Narayan',
+                  'dataset_group': get_dataset_group(m['config']['dataset'])} for m in narayan_results]
+   
+    res_narayan = [{**m, 'normalized_dataset': normalize_dataset(m)} for m in res_narayan]
+
+    return res_narayan
+
+
 def get_garf_global_performance(garf_results_path: str):
     results = []
     garf_results_dir = Path(garf_results_path)
@@ -911,48 +905,81 @@ def get_garf_global_performance(garf_results_path: str):
     results = [r for r in results if not (r['dataset_group'] == 'Renuver' and str(r['error_fraction']) in ['2', '4', '5'])]
     return results
 
-def plot_mimir_vs_baran(res_baran: list[dict], res_mimir: list[dict]) -> Tuple[plt.figure, plt.axes, pd.DataFrame, List]:
-    """
-    Boxplot global performance Mimir vs Baran.
-    """
-    df = pd.DataFrame([*res_mimir, *res_baran])
-
-    df_melt = pd.melt(df, id_vars=['dataset_group', 'ensemble'], value_vars=['f1'], 
-                  var_name='F1 Type', value_name='F1 Score')
-
-    fig, ax = plt.subplots(figsize=(FIGURE_HEIGHT, FIGURE_WIDTH))
-
+def defect_user_table(mimir_results_path, baran_results_path):
+    DATASETS_ORDER = BARAN_DATASETS + RENUVER_DATASETS + OPENML_DATASETS
     
-    # Create the boxplot
-    sns.boxplot(data=df_melt, x='dataset_group', y='F1 Score', hue='ensemble', 
-                palette=MIMIR_LABEL_COLORS, fliersize=2, linewidth=0.8, showfliers=False, 
-                ax=ax, gap=.1)
+    res_mimir, failed_measurements = get_mimir_result(mimir_results_path)
+    res_mimir = [{**r, 'ensemble': 'Mimir'} for r in res_mimir if r['labeling_error_pct'] == 1]
 
-    # Set axis labels and title
-    ax.set_xlabel('')
-    ax.set_ylabel('$F_1$ score', fontsize=ACHSEN_FONTSIZE)
+    res_baran, failed_measurements = get_mimir_result(baran_results_path)
+    res_baran = [{**r, 'ensemble': 'Baran'} for r in res_baran]
 
-    # Remove spines
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-
-    ax.tick_params(axis='x', which='both', bottom=False, labelsize=ACHSEN_FONTSIZE)
-
-    # Set y-axis ticks
-    ax.set_yticks([0.0, 0.25, 0.5, 0.75, 1.0])
-
-    # Add legend
-    ax.legend(loc='best',
-            fontsize=8, 
-            ncol=len(df_melt['ensemble'].unique())
+    df = pd.DataFrame([*res_mimir, *res_baran])
+    
+    df_results = (pd.pivot((df.loc[:, ['normalized_dataset', 'ensemble', 'f1', 'precision', 'recall']]
+            .groupby(['normalized_dataset', 'ensemble'])
+            .agg({'f1': 'mean', 'precision': 'mean', 'recall': 'mean'})
+            .reset_index()
+            ),
+            columns='ensemble',
+            index='normalized_dataset',
+            values=['f1', 'precision', 'recall'])
+            .round(2)
             )
+    df_results.columns = df_results.columns.swaplevel(0,1)  # group by correction system
+    df_results.sort_index(inplace=True, axis=1)  # sort columns
+    
+    df_results.sort_index(inplace=True, 
+                          key=lambda index: [DATASETS_ORDER.index(x[0]) for x in index.str.split(' ')],
+                          axis=0
+                         )
 
-    # Limit the y-axis from 0 to 1
-    ax.set_ylim([0, 1.05])
+    df_results = df_results.loc[:, ['Mimir', 'Baran',]]  # order columns
+    return df_results
 
-    return fig, ax, df_melt
+def raha_ed_table(raha_results_path, mimir_results_path, baran_results_path):
+    DATASETS_ORDER = BARAN_DATASETS + RENUVER_DATASETS + OPENML_DATASETS
 
-def performance_table(mimir_results_path, baran_results_path, baranpp_results_path, garf_results_path, holoclean_results_path, full_metrics=True) -> Tuple[pd.DataFrame, List]:
+    res_raha = get_raha_result(raha_results_path)
+    res_raha = [{**r, 'ensemble': 'Raha & Perfect EC'} for r in res_raha]
+
+    res_mimir, failed_measurements = get_mimir_result(mimir_results_path)
+    res_mimir = [{**r, 'ensemble': 'Raha & Mimir'} for r in res_mimir]
+
+    res_baran, failed_measurements = get_mimir_result(baran_results_path)
+    res_baran = [{**r, 'ensemble': 'Raha & Baran'} for r in res_baran]
+
+    df = pd.DataFrame([*res_raha, *res_mimir, *res_baran])
+    
+    df_results = (pd.pivot((df.loc[:, ['normalized_dataset', 'ensemble', 'f1', 'precision', 'recall']]
+            .groupby(['normalized_dataset', 'ensemble'])
+            .agg({'f1': 'mean', 'precision': 'mean', 'recall': 'mean'})
+            .reset_index()
+            ),
+            columns='ensemble',
+            index='normalized_dataset',
+            values=['f1', 'precision', 'recall'])
+            .round(2)
+            )
+    df_results.columns = df_results.columns.swaplevel(0,1)  # group by correction system
+    df_results.sort_index(inplace=True, axis=1)  # sort columns
+
+    df_results.sort_index(inplace=True, 
+                          key=lambda index: [DATASETS_ORDER.index(x[0]) for x in index.str.split(' ')],
+                          axis=0
+                         )
+
+    df_results = df_results.loc[:, ['Raha & Perfect EC', 'Raha & Mimir', 'Raha & Baran']]
+    return df_results
+
+def performance_table(mimir_results_path,
+                      baran_results_path,
+                      baranpp_results_path,
+                      garf_results_path,
+                      holoclean_results_path,
+                      renuver_results_path,
+                      narayan_results_path,
+                      metrics:str = 'full') -> Tuple[pd.DataFrame, List]:
     DATASETS_ORDER = BARAN_DATASETS + RENUVER_DATASETS + OPENML_DATASETS
     
     res_mimir, failed_measurements = get_mimir_result(mimir_results_path)
@@ -984,9 +1011,20 @@ def performance_table(mimir_results_path, baran_results_path, baranpp_results_pa
                 'recall': r['recall']} for r in res_garf]
     res_garf = [r for r in res_garf if not (r['dataset_group'] == 'OpenML' and 'simple_mcar' == r['error_class'])]
 
-    df = pd.DataFrame([*res_mimir, *res_baranpp, *res_baran, *res_hc, *res_garf])
+    res_renuver = get_renuver_result(renuver_results_path)
+    res_renuver = [{'normalized_dataset': r['normalized_dataset'],
+                'ensemble': r['ensemble'],
+                'dataset_group': r['dataset_group'],
+                'error_class': r['error_class'],
+                'f1': r['f1'],
+                'precision': r['precision'],
+                'recall': r['recall']} for r in res_renuver]
+
+    res_narayan = get_narayan_result(narayan_results_path)
+
+    df = pd.DataFrame([*res_mimir, *res_baranpp, *res_baran, *res_hc, *res_garf, *res_renuver, *res_narayan])
     
-    if full_metrics:
+    if metrics == 'full':
         df_results = (pd.pivot((df.loc[:, ['normalized_dataset', 'ensemble', 'f1', 'precision', 'recall']]
                 .groupby(['normalized_dataset', 'ensemble'])
                 .agg({'f1': 'mean', 'precision': 'mean', 'recall': 'mean'})
@@ -1000,24 +1038,26 @@ def performance_table(mimir_results_path, baran_results_path, baranpp_results_pa
         df_results.columns = df_results.columns.swaplevel(0,1)  # group by correction system
         df_results.sort_index(inplace=True, axis=1)  # sort columns
 
-    else:
-        df_results = (pd.pivot((df.loc[:, ['normalized_dataset', 'ensemble', 'f1']]
+    elif metrics in ['f1', 'precision', 'recall']:
+        df_results = (pd.pivot((df.loc[:, ['normalized_dataset', 'ensemble', metrics]]
                     .groupby(['normalized_dataset', 'ensemble'])
-                    .agg({'f1': 'mean'})
+                    .agg({metrics: 'mean'})
                     .reset_index()
                     ),
                     columns='ensemble',
                     index='normalized_dataset',
-                    values='f1')
+                    values=metrics)
                     .round(2)
                 )
+    else:
+        raise ValueError('invalid metrics.')
     
     df_results.sort_index(inplace=True, 
                           key=lambda index: [DATASETS_ORDER.index(x[0]) for x in index.str.split(' ')],
                           axis=0
                          )
 
-    df_results = df_results.loc[:, ['Mimir', 'Baran++', 'Baran', 'HoloClean', 'Garf']]  # order columns
+    df_results = df_results.loc[:, ['Mimir', 'Baran++', 'Baran', 'HoloClean', 'Garf', 'RENUVER', 'Narayan']]  # order columns
     return df_results
 
 
@@ -1042,7 +1082,7 @@ def et_corrfm_vs_value_model(mimir_result_dir: str) -> Tuple[plt.figure, List[pl
     df_bars = df[df['normalized_dataset'].isin(dataset_subset)]
     df_bars = df_bars[df_bars['feature_generators'].isin(['llm_correction', 'value_model'])]
 
-    fig = plt.figure(figsize=(2*FIGURE_HEIGHT, 2*FIGURE_WIDTH), constrained_layout=True)
+    fig = plt.figure(figsize=(2*FIGURE_WIDTH, 2*FIGURE_HEIGHT), constrained_layout=True)
     axes = fig.subplot_mosaic([['.', 0, 0, 1, 1], ['.', 0, 0, 1, 1], ['.', 2, 2, 2, 2]])
     palette = sns.color_palette('Set3')
 
@@ -1171,7 +1211,7 @@ def sc_phodi_vs_vicinity_model(mimir_phodi_vs_vicinity_dir: str) -> Tuple[plt.fi
 
     df_pivot = pd.pivot(df, columns='feature_generators', index='normalized_dataset', values=['f1', 'precision', 'recall'])
 
-    fig = plt.figure(figsize=(2*FIGURE_HEIGHT, 2*FIGURE_WIDTH), constrained_layout=True)
+    fig = plt.figure(figsize=(2*FIGURE_WIDTH, 2*FIGURE_HEIGHT), constrained_layout=True)
     axes = fig.subplot_mosaic([['.', 0, 0, 1, 1], ['.', 0, 0, 1, 1], ['.', 2, 2, 2, 2]])
 
     annotations = {'precision': {}, 'recall': {}}
@@ -1238,6 +1278,112 @@ def sc_phodi_vs_vicinity_model(mimir_phodi_vs_vicinity_dir: str) -> Tuple[plt.fi
 
     return fig, axes, failed_measurements
 
+def new_plot_runtime(mimir_result_dir: str, baran_result_dir: str, baranpp_result_dir: str, error_stats_dir: str, correct_timeouts):
+    res_mimir_runtime, failed_measurements = get_mimir_result(mimir_result_dir)
+    res_baran_runtime, failed_measurements = get_mimir_result(baran_result_dir)
+    res_baranpp_runtime, failed_measurements = get_mimir_result(baranpp_result_dir)
+    res_error_stats = load_error_stats(error_stats_dir)
+    
+    res_baran_runtime = [r for r in res_baran_runtime if not (r['dataset_group'] == 'OpenML' and 'simple_mcar' == r['error_class'])]
+    res_baranpp_runtime = [r for r in res_baranpp_runtime if not (r['dataset_group'] == 'OpenML' and 'simple_mcar' == r['error_class'])]
+
+    DATASETS_ORDER = BARAN_DATASETS + RENUVER_NORMALIZED_DATASETS + OPENML_DATASETS
+    res_mimir_runtime.sort(key=lambda x: DATASETS_ORDER.index(x['normalized_dataset']), reverse=True)
+    res_baran_runtime.sort(key=lambda x: DATASETS_ORDER.index(x['normalized_dataset']), reverse=True)
+    res_baranpp_runtime.sort(key=lambda x: DATASETS_ORDER.index(x['normalized_dataset']), reverse=True)
+
+    fig, ax = plt.subplots(figsize=(2*FIGURE_WIDTH, 2*FIGURE_HEIGHT))
+    
+    if correct_timeouts:
+        timeout_datasets = [
+            {'normalized_dataset': 'tax', 'runtime': 1E4, 'synth_cleaning_threshold': None},
+            {'normalized_dataset': 'tax', 'runtime': 1E4, 'synth_cleaning_threshold': None},
+            {'normalized_dataset': 'tax', 'runtime': 1E4, 'synth_cleaning_threshold': None},
+            {'normalized_dataset': 'food', 'runtime': 1E4, 'synth_cleaning_threshold': None},
+            {'normalized_dataset': 'food', 'runtime': 1E4, 'synth_cleaning_threshold': None},
+            {'normalized_dataset': 'food', 'runtime': 1E4, 'synth_cleaning_threshold': None},
+        ]
+        res_baranpp_runtime = res_baranpp_runtime + timeout_datasets
+    
+    df_mimir_runtimes = (pd.DataFrame(res_mimir_runtime)
+                         .loc[:, ['normalized_dataset', 'runtime']]
+                         .groupby(['normalized_dataset'])
+                         .agg({'runtime': 'mean'})
+                         .reset_index()
+                         )
+    df_mimir_runtimes.columns = ['normalized_dataset', 'mimir']
+
+    df_baran_runtimes = (pd.DataFrame(res_baran_runtime)
+                         .loc[:, ['normalized_dataset', 'runtime']]
+                         .groupby(['normalized_dataset'])
+                         .agg({'runtime': 'mean'})
+                         .reset_index())
+    df_baran_runtimes.columns = ['normalized_dataset', 'baran']
+
+    df_baranpp_runtimes = (pd.DataFrame(res_baranpp_runtime)
+                         .loc[:, ['normalized_dataset', 'runtime']]
+                         .groupby(['normalized_dataset'])
+                         .agg({'runtime': 'mean'})
+                         .reset_index())
+    df_baranpp_runtimes.columns = ['normalized_dataset', 'baranpp']
+
+    ax.scatter([r['runtime'] for r in res_mimir_runtime], [r['normalized_dataset'] for r in res_mimir_runtime], label='Mimir', marker='*')
+    ax.scatter([r['runtime'] for r in res_baran_runtime], [r['normalized_dataset'] for r in res_baran_runtime], label='Baran', marker='.')
+    ax.scatter([r['runtime'] for r in res_baranpp_runtime], [r['normalized_dataset'] for r in res_baranpp_runtime], label='Baran++', marker='+')
+
+    ax.axvline(10000, color='#4e4e4d', linestyle='-', linewidth=.5, ymin=0.04, ymax=0.96)
+    ax.annotate('Time  Limit', xy=(10000, 1), xytext=(5450, -0.81), horizontalalignment='left', color='#4e4e4d', fontsize=REST_FONTSIZE)
+    
+    plt.ylabel('Dataset', fontsize=ACHSEN_FONTSIZE)
+    plt.xlabel('Runtime (s)', fontsize=ACHSEN_FONTSIZE)
+    plt.xscale('log')  # Set x-axis scale to logarithmic
+    plt.legend(fontsize=REST_FONTSIZE)
+    
+    ax.spines['left'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.tick_params(axis='both', which='both', bottom=False, left=False, labelsize=REST_FONTSIZE)
+    plt.grid(axis='y', linestyle=':')
+
+    text_x_pos = max([r['runtime'] for r in res_mimir_runtime]) * 5.5
+    yticks = ax.get_yticks()
+    highest_y = max(yticks)  # Highest dataset position
+    ax.text(
+        x=text_x_pos *0.1 ,
+        y=highest_y + 0.5,
+        s='Mimir Runtime per Error (s)',
+        fontsize=REST_FONTSIZE,
+        va='bottom',
+        ha='left',
+        color='black'
+    )
+    df_error_stats = (pd.DataFrame(res_error_stats)
+                         .loc[:, ['normalized_dataset', 'n_errors']]
+                         .groupby(['normalized_dataset'])
+                         .agg({'n_errors': 'first'})
+                         .reset_index()
+                         )
+    joined_df = pd.merge(df_error_stats, df_mimir_runtimes, on='normalized_dataset', how='left') # or how='left', 'right', 'outer' as needed
+    joined_df = pd.merge(joined_df, df_baran_runtimes, on='normalized_dataset', how='left')
+    joined_df = pd.merge(joined_df, df_baranpp_runtimes, on='normalized_dataset', how='left')
+    joined_df['baran_per_error'] = round(joined_df['baran'] / joined_df['n_errors'], 2)
+    joined_df['mimir_per_error'] = round(joined_df['mimir'] / joined_df['n_errors'], 2)
+    joined_df['baranpp_per_error'] = round(joined_df['baranpp'] / joined_df['n_errors'], 2)
+
+    for r in joined_df.itertuples():
+        ax.text(
+            x=text_x_pos,  # Position text slightly to the right
+            y=r.normalized_dataset,
+            s=str(r.mimir_per_error),
+            fontsize=REST_FONTSIZE,
+            va='center',
+            ha='left',
+            color='black'
+        )
+
+    return fig, ax, joined_df
+
 def plot_runtime(mimir_result_dir: str, baran_result_dir: str, baranpp_result_dir: str, correct_timeouts):
     res_mimir_runtime, failed_measurements = get_mimir_result(mimir_result_dir)
     res_baran_runtime, failed_measurements = get_mimir_result(baran_result_dir)
@@ -1246,12 +1392,12 @@ def plot_runtime(mimir_result_dir: str, baran_result_dir: str, baranpp_result_di
     res_baran_runtime = [r for r in res_baran_runtime if not (r['dataset_group'] == 'OpenML' and 'simple_mcar' == r['error_class'])]
     res_baranpp_runtime = [r for r in res_baranpp_runtime if not (r['dataset_group'] == 'OpenML' and 'simple_mcar' == r['error_class'])]
 
-    DATASETS_ORDER = BARAN_DATASETS + RENUVER_DATASETS + OPENML_DATASETS
-    res_mimir_runtime.sort(key=lambda x: DATASETS_ORDER.index(x['normalized_dataset'].split(' ')[0]), reverse=True)
-    res_baran_runtime.sort(key=lambda x: DATASETS_ORDER.index(x['normalized_dataset'].split(' ')[0]), reverse=True)
-    res_baranpp_runtime.sort(key=lambda x: DATASETS_ORDER.index(x['normalized_dataset'].split(' ')[0]), reverse=True)
+    DATASETS_ORDER = BARAN_DATASETS + RENUVER_NORMALIZED_DATASETS + OPENML_DATASETS
+    res_mimir_runtime.sort(key=lambda x: DATASETS_ORDER.index(x['normalized_dataset']), reverse=True)
+    res_baran_runtime.sort(key=lambda x: DATASETS_ORDER.index(x['normalized_dataset']), reverse=True)
+    res_baranpp_runtime.sort(key=lambda x: DATASETS_ORDER.index(x['normalized_dataset']), reverse=True)
 
-    fig, ax = plt.subplots(figsize=(2*FIGURE_HEIGHT, 2*FIGURE_WIDTH))
+    fig, ax = plt.subplots(figsize=(2*FIGURE_WIDTH, 2*FIGURE_HEIGHT))
     
     if correct_timeouts:
         timeout_datasets = [
@@ -1268,7 +1414,7 @@ def plot_runtime(mimir_result_dir: str, baran_result_dir: str, baranpp_result_di
     ax.scatter([r['runtime'] for r in res_baranpp_runtime], [r['normalized_dataset'] for r in res_baranpp_runtime], label='Baran++', marker='+')
 
 
-    ax.axvline(10000, color='#4e4e4d', linestyle='-', linewidth=.5)
+    ax.axvline(10000, color='#4e4e4d', linestyle='-', linewidth=.5, ymin=0.04, ymax=0.96)
     ax.annotate('Time  Limit', xy=(10000, 1), xytext=(5450, -0.81), horizontalalignment='left', color='#4e4e4d', fontsize=REST_FONTSIZE)
     
     plt.ylabel('Dataset', fontsize=ACHSEN_FONTSIZE)
@@ -1283,3 +1429,84 @@ def plot_runtime(mimir_result_dir: str, baran_result_dir: str, baranpp_result_di
     #plt.grid(axis='x', linestyle=':')
     plt.grid(axis='y', linestyle=':')
     return fig, ax
+
+
+def load_llm_inference_runtime(results_dir: str):
+    measurements = []
+    pathlist = Path(results_dir).glob('*.json')
+    for path in pathlist:
+        with open(path) as f:
+            measurements.append(json.load(f))
+    
+    return measurements
+
+
+def load_error_stats(error_stats_dir: str):
+    measurements = []
+    pathlist = Path(error_stats_dir).glob('*.json')
+    for path in pathlist:
+        with open(path) as f:
+            measurements.append(json.load(f))
+    res = [{**r, 'normalized_dataset': normalize_dataset(r)} for r in measurements]
+    return res
+
+
+def load_scalability_results(results_dir: str, dimension: str) -> list[dict]:
+    measurements = []
+    pathlist = Path(results_dir).glob('*.json')
+    for path in pathlist:
+        with open(path) as f:
+            measurements.append(json.load(f))
+    relevant = [{dimension: x['config'][dimension], 'runtime': x['result']['runtime'], 'f1': x['result']['f1']} for x in measurements]
+
+    return relevant
+
+
+def scalability_experiment() -> Tuple[plt.figure, List[plt.axes], List]:
+    fig, axs = plt.subplots(1, 3, figsize=(FULL_FIGURE_WIDTH, FIGURE_HEIGHT), sharey=True)  # Sharing y-axis
+    params = [(0, 'n_cols', 'Columns'), (1, 'n_rows', 'Rows (×10³)'), (2, 'error_fraction', 'Error Rate (%)')]
+    measurements = []
+
+    for i, measure, label in params:
+        results = load_scalability_results(f'measurements/scalability/2025-03-04-{measure}', measure)
+        measurements.extend(results)
+
+        df = (pd.DataFrame(results)
+              .groupby([measure])
+              .agg({'runtime': 'mean', 'f1': 'mean'})
+              .reset_index())
+        
+        if measure == 'n_rows':
+            df[measure] = df[measure] / 1000
+        
+        sns.lineplot(x=df[measure], y=df['runtime'], ax=axs[i], color='black', marker='o')
+        axs[i].grid(True, linestyle='--', alpha=0.7)
+
+        # Annotate each point with its corresponding 'f1' value
+        for j, x, y, f1 in zip(range(df.shape[0]), df[measure], df['runtime'], df['f1']):
+            xx, yy = 0, 0
+            if j == 0:
+                xx = df[measure][0] * 0.62
+                yy = 0
+            if j == 1:
+                xx = df[measure][0] * 0.62
+                yy = 100
+            axs[i].text(x+xx, y-yy, f'{f1:.2f}', ha='right', va='bottom', fontsize=ACHSEN_FONTSIZE)
+
+        axs[i].set_xlabel(label, fontsize=ACHSEN_FONTSIZE)
+        axs[i].set_ylabel('Runtime (s)', fontsize=ACHSEN_FONTSIZE)
+
+        xticks = df[measure].values
+        axs[i].set_xticks(xticks)  # Explicitly set x-ticks
+        axs[i].tick_params(axis='y', labelsize=REST_FONTSIZE)
+        axs[i].tick_params(axis='x', labelsize=REST_FONTSIZE)
+
+    letters = ['a', 'b', 'c']
+    for i, ax in enumerate(axs):
+        # Add label in the bottom right corner
+        x, y = -.018, -0.24
+        ax.text(x, y, f'{letters[i]})', transform=ax.transAxes,
+                ha='right', va='bottom', bbox=dict(facecolor='white', alpha=0, edgecolor='white'),
+            fontsize=ACHSEN_FONTSIZE)
+
+    return fig, axs, measurements

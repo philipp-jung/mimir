@@ -1,0 +1,1 @@
+{"status": 1, "result": {"precision": 0.02493765586034913, "recall": 0.014227642276422764, "f1": 0.018118286527759802, "runtime": 257.3985776901245}, "config": {"task": "correction", "dataset": "flights", "n_rows": null, "error_fraction": 1, "error_class": "simple_mcar", "error_detection_mode": "perfect", "labeling_error_pct": 1, "run": 2}}

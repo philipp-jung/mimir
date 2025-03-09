@@ -1,0 +1,1 @@
+{"status": 1, "result": {"precision": 0.016129032258064516, "recall": 0.014723926380368098, "f1": 0.01539448364336113, "runtime": 407.24337124824524}, "config": {"task": "correction", "dataset": "cars", "n_rows": null, "error_fraction": 3, "error_class": "simple_mcar", "error_detection_mode": "perfect", "labeling_error_pct": 1, "run": 1}}

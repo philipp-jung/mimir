@@ -1,0 +1,1 @@
+{"status": 1, "result": {"precision": 0.13782051282051283, "recall": 0.08447937131630648, "f1": 0.10475030450669914, "runtime": 1298.9506878852844}, "config": {"task": "correction", "dataset": "hospital", "n_rows": null, "error_fraction": 1, "error_class": "simple_mcar", "error_detection_mode": "perfect", "labeling_error_pct": 1, "run": 0}}

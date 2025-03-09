@@ -21,7 +21,7 @@ def run_mirmir(c: dict):
     start_time = time.time()
 
     try:
-        data = dataset.Dataset(c['dataset'], c['error_fraction'], version, c['error_class'], c["n_rows"])
+        data = dataset.Dataset(c['dataset'], c['error_fraction'], version, c['error_class'], c["n_rows"], c.get("n_cols"))
         data.detected_cells = data.get_errors_dictionary(c['detection_mode'])
 
         app = correction.Cleaning(

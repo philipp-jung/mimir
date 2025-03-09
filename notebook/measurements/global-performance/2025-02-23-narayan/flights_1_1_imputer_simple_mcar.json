@@ -1,0 +1,1 @@
+{"status": 1, "result": {"precision": 0.013821138211382113, "recall": 0.013821138211382113, "f1": 0.013821138211382113}, "config": {"dataset": "flights", "error_fraction": 1, "version": 1, "error_class": "imputer_simple_mcar", "n_rows": null, "n_cols": null}}

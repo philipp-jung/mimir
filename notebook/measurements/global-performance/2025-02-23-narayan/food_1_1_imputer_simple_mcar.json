@@ -1,0 +1,1 @@
+{"status": 1, "result": {"precision": 0.25541795665634676, "recall": 0.25541795665634676, "f1": 0.25541795665634676}, "config": {"dataset": "food", "error_fraction": 1, "version": 1, "error_class": "imputer_simple_mcar", "n_rows": null, "n_cols": null}}

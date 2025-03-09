@@ -1,0 +1,1 @@
+{"status": 1, "result": {"precision": 0.7922606924643585, "recall": 0.410337552742616, "f1": 0.5406532314107019, "runtime": 599.228363275528}, "config": {"task": "correction", "dataset": "rayyan", "n_rows": null, "error_fraction": 1, "error_class": "simple_mcar", "error_detection_mode": "raha", "run": 0}}

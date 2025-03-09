@@ -1,0 +1,1 @@
+{"dataset": "bridges", "error_fraction": 3, "error_class": "imputer_simple_mcar", "run": 1, "ed_p": 1.0, "ed_r": 1.0, "ed_f": 1.0, "ec_p": 0.30952380952380953, "ec_r": 0.30952380952380953, "ec_f": 0.30952380952380953}
